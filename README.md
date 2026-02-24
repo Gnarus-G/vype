@@ -31,12 +31,6 @@ sudo pacman -S xdotool vulkan-tools
 sudo apt install libxdo-dev libvulkan1
 ```
 
-**Fedora:**
-
-```bash
-sudo dnf install libxdo-devel vulkan-loader
-```
-
 ## Installation
 
 ### Quick Install
