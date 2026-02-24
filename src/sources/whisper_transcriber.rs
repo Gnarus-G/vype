@@ -1,16 +1,16 @@
 use crate::sources::{SourceError, Transcriber};
 
-#[cfg(feature = "transcription")]
+#[cfg(any(feature = "vulkan", feature = "cuda"))]
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 pub struct WhisperTranscriber {
-    #[cfg(feature = "transcription")]
+    #[cfg(any(feature = "vulkan", feature = "cuda"))]
     ctx: WhisperContext,
     language: String,
 }
 
 impl WhisperTranscriber {
-    #[cfg(feature = "transcription")]
+    #[cfg(any(feature = "vulkan", feature = "cuda"))]
     pub fn new(model_path: &str, language: &str) -> Result<Self, SourceError> {
         let ctx_params = WhisperContextParameters::default();
         let ctx = WhisperContext::new_with_params(model_path, ctx_params)
@@ -21,17 +21,17 @@ impl WhisperTranscriber {
         })
     }
 
-    #[cfg(not(feature = "transcription"))]
+    #[cfg(not(any(feature = "vulkan", feature = "cuda")))]
     pub fn new(_model_path: &str, _language: &str) -> Result<Self, SourceError> {
         Err(SourceError::Transcription(
-            "Transcription feature not enabled. Recompile with --features transcription"
+            "GPU feature not enabled. Recompile with --features vulkan or --features cuda"
                 .to_string(),
         ))
     }
 }
 
 impl Transcriber for WhisperTranscriber {
-    #[cfg(feature = "transcription")]
+    #[cfg(any(feature = "vulkan", feature = "cuda"))]
     fn transcribe(&self, audio: &[f32]) -> Result<String, SourceError> {
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         params.set_language(Some(&self.language));
@@ -58,10 +58,10 @@ impl Transcriber for WhisperTranscriber {
         Ok(result.trim().to_string())
     }
 
-    #[cfg(not(feature = "transcription"))]
+    #[cfg(not(any(feature = "vulkan", feature = "cuda")))]
     fn transcribe(&self, _audio: &[f32]) -> Result<String, SourceError> {
         Err(SourceError::Transcription(
-            "Transcription feature not enabled".to_string(),
+            "GPU feature not enabled".to_string(),
         ))
     }
 }

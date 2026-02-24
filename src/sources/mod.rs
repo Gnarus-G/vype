@@ -32,7 +32,7 @@ pub mod cpal_audio;
 #[cfg(not(test))]
 pub mod xdo_keyboard;
 
-#[cfg(all(feature = "transcription", not(test)))]
+#[cfg(all(any(feature = "vulkan", feature = "cuda"), not(test)))]
 pub mod whisper_transcriber;
 
 #[cfg(not(test))]
@@ -41,5 +41,5 @@ pub use cpal_audio::CpalAudioSource;
 #[cfg(not(test))]
 pub use xdo_keyboard::XdoKeyboardSink;
 
-#[cfg(all(feature = "transcription", not(test)))]
+#[cfg(all(any(feature = "vulkan", feature = "cuda"), not(test)))]
 pub use whisper_transcriber::WhisperTranscriber;

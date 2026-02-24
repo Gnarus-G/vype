@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: vulkan
+            features: vulkan
+          - name: cuda
+            features: cuda
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxdo-dev libvulkan-dev
+      
+      - name: Install CUDA Toolkit
+        if: matrix.name == 'cuda'
+        run: |
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update
+          sudo apt-get install -y cuda-nvcc-12-6 cuda-cudart-dev-12-6
+          echo "/usr/local/cuda-12.6/bin" >> $GITHUB_PATH
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.name }}-
+      
+      - name: Build
+        run: cargo build --release --features ${{ matrix.features }}
+      
+      - name: Package
+        run: |
+          strip target/release/vype
+          tar -czvf vype-${{ github.ref_name }}-x86_64-linux-${{ matrix.name }}.tar.gz -C target/release vype
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vype-${{ matrix.name }}
+          path: vype-*.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Create Release
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            artifacts/vype-vulkan/*.tar.gz \
+            artifacts/vype-cuda/*.tar.gz
+        env:
+          GH_TOKEN: ${{ github.token }}

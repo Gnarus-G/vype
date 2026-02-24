@@ -7,16 +7,19 @@ use env_logger::Env;
 use rdev::{listen, Event, EventType, Key};
 
 use vype::config::Config;
-#[cfg(feature = "transcription")]
+#[cfg(any(feature = "vulkan", feature = "cuda"))]
 use vype::sources::AudioSource;
-#[cfg(feature = "transcription")]
+#[cfg(any(feature = "vulkan", feature = "cuda"))]
 use vype::sources::CpalAudioSource;
 
-#[cfg(feature = "transcription")]
+#[cfg(any(feature = "vulkan", feature = "cuda"))]
 use vype::sources::{KeyboardSink, Transcriber, WhisperTranscriber, XdoKeyboardSink};
 
-#[cfg(feature = "transcription")]
+#[cfg(any(feature = "vulkan", feature = "cuda"))]
 use vype::model::get_model_path;
+
+#[cfg(any(feature = "vulkan", feature = "cuda"))]
+use vype::pure::resample::resample_to_16khz_mono;
 
 fn main() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
@@ -41,20 +44,22 @@ fn main() -> Result<()> {
     let (tx, rx) = std::sync::mpsc::channel();
     let tx_clone = tx.clone();
     let recording_clone = recording.clone();
-    let _model_opt = config.model.clone();
-    let _language_opt = config.language.clone();
-
-    #[cfg(feature = "transcription")]
-    let mut sink = XdoKeyboardSink::new().expect("Failed to create xdo keyboard");
+    let model_opt = config.model.clone();
+    let model_size_opt = config.model_size.clone();
+    let language_opt = config.language.clone();
 
     std::thread::spawn(move || {
-        #[cfg(feature = "transcription")]
-        let model_path = get_model_path(model_opt.as_deref()).expect("Failed to get model");
+        #[cfg(any(feature = "vulkan", feature = "cuda"))]
+        let mut sink = XdoKeyboardSink::new().expect("Failed to create xdo keyboard");
 
-        #[cfg(feature = "transcription")]
+        #[cfg(any(feature = "vulkan", feature = "cuda"))]
+        let model_path = get_model_path(model_opt.as_deref(), model_size_opt.as_deref())
+            .expect("Failed to get model");
+
+        #[cfg(any(feature = "vulkan", feature = "cuda"))]
         let mut audio_source = CpalAudioSource::new().expect("Failed to create audio source");
 
-        #[cfg(feature = "transcription")]
+        #[cfg(any(feature = "vulkan", feature = "cuda"))]
         let transcriber = WhisperTranscriber::new(model_path.to_str().unwrap(), &language_opt)
             .expect("Failed to create transcriber");
 
@@ -62,7 +67,7 @@ fn main() -> Result<()> {
             if let Ok(msg) = rx.recv_timeout(std::time::Duration::from_millis(50)) {
                 match msg {
                     AppMsg::StartRecording => {
-                        #[cfg(feature = "transcription")]
+                        #[cfg(any(feature = "vulkan", feature = "cuda"))]
                         {
                             if let Err(e) = audio_source.start() {
                                 log::error!("Error starting audio: {}", e);
@@ -72,15 +77,28 @@ fn main() -> Result<()> {
                         }
                     }
                     AppMsg::StopRecording => {
-                        #[cfg(feature = "transcription")]
+                        #[cfg(any(feature = "vulkan", feature = "cuda"))]
                         {
                             let samples = audio_source.stop();
                             log::info!("Recording stopped. Samples: {}", samples.len());
                             if !samples.is_empty() {
-                                match transcriber.transcribe(&samples) {
+                                let resampled = resample_to_16khz_mono(
+                                    &samples,
+                                    audio_source.sample_rate(),
+                                    audio_source.channels(),
+                                );
+                                log::info!(
+                                    "Resampled from {}Hz to 16kHz: {} -> {} samples",
+                                    audio_source.sample_rate(),
+                                    samples.len(),
+                                    resampled.len()
+                                );
+                                match transcriber.transcribe(&resampled) {
                                     Ok(text) => {
                                         log::info!("Transcribed: {}", text);
-                                        sink.type_text(&text);
+                                        if !text.is_empty() {
+                                            sink.type_text(&text);
+                                        }
                                     }
                                     Err(e) => log::error!("Transcription error: {}", e),
                                 }
