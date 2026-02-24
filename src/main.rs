@@ -45,9 +45,12 @@ fn main() -> Result<()> {
     let (tx, rx) = std::sync::mpsc::channel();
     let tx_clone = tx.clone();
     let recording_clone = recording.clone();
-    let model_opt = config.model.clone();
-    let model_size_opt = config.model_size.clone();
-    let language_opt = config.language.clone();
+    #[cfg(any(feature = "vulkan", feature = "cuda"))]
+    let (model_opt, model_size_opt, language_opt) = (
+        config.model.clone(),
+        config.model_size.clone(),
+        config.language.clone(),
+    );
 
     std::thread::spawn(move || {
         #[cfg(any(feature = "vulkan", feature = "cuda"))]
