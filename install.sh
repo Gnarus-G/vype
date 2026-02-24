@@ -7,12 +7,12 @@ INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 check_runtime_deps() {
     local missing=()
     
-    if ! ldconfig -p | grep -q "libxdo.so"; then
-        missing+=("libxdo-dev (or libxdo)")
+    if ! ldconfig -p 2>/dev/null | grep -q "libxdo.so" && ! pacman -Qi libxdo &>/dev/null; then
+        missing+=("libxdo")
     fi
     
-    if ! ldconfig -p | grep -q "libasound.so"; then
-        missing+=("libasound2-dev (or libasound2)")
+    if ! ldconfig -p 2>/dev/null | grep -q "libasound.so" && ! pacman -Qi alsa-lib &>/dev/null; then
+        missing+=("alsa-lib")
     fi
     
     if [ ${#missing[@]} -gt 0 ]; then
@@ -22,8 +22,22 @@ check_runtime_deps() {
         done
         echo "" >&2
         echo "Install with:" >&2
-        echo "  sudo apt install libxdo-dev libasound2-dev" >&2
+        if [ -f /etc/arch-release ]; then
+            echo "  sudo pacman -S libxdo alsa-lib" >&2
+        else
+            echo "  sudo apt install libxdo-dev libasound2-dev" >&2
+        fi
         exit 1
+    fi
+}
+
+detect_distro() {
+    if [ -f /etc/arch-release ]; then
+        echo "arch"
+    elif [ -f /etc/debian_version ] || [ -f /etc/ubuntu-version ]; then
+        echo "ubuntu"
+    else
+        echo "ubuntu"
     fi
 }
 
@@ -43,16 +57,17 @@ detect_gpu() {
 
 VERSION="${1:-$(get_latest_release)}"
 GPU_BACKEND="${VYPE_GPU:-$(detect_gpu)}"
-ARCH="x86_64-linux"
+DISTRO="${VYPE_DISTRO:-$(detect_distro)}"
+ARCH="x86_64"
 
 check_runtime_deps
 
-echo "Installing vype $VERSION ($GPU_BACKEND backend)..."
+echo "Installing vype $VERSION ($GPU_BACKEND backend, $DISTRO)..."
 
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
-TARBALL="vype-$VERSION-$ARCH-$GPU_BACKEND.tar.gz"
+TARBALL="vype-$VERSION-$ARCH-$DISTRO-$GPU_BACKEND.tar.gz"
 URL="https://github.com/$REPO/releases/download/$VERSION/$TARBALL"
 
 echo "Downloading $URL..."

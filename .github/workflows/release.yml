@@ -9,7 +9,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  build-ubuntu:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -48,9 +48,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ubuntu-cargo-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.name }}-
+            ubuntu-cargo-${{ matrix.name }}-
       
       - name: Build
         run: cargo build --release --features ${{ matrix.features }}
@@ -58,16 +58,75 @@ jobs:
       - name: Package
         run: |
           strip target/release/vype
-          tar -czvf vype-${{ github.ref_name }}-x86_64-linux-${{ matrix.name }}.tar.gz -C target/release vype
+          tar -czvf vype-${{ github.ref_name }}-x86_64-ubuntu-${{ matrix.name }}.tar.gz -C target/release vype
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vype-${{ matrix.name }}
+          name: vype-ubuntu-${{ matrix.name }}
+          path: vype-*.tar.gz
+
+  build-arch:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: vulkan
+            features: vulkan
+          - name: cuda
+            features: cuda
+    
+    steps:
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm base-devel git curl libxdo vulkan-headers vulkan-icd-loader alsa-lib gtk3
+      
+      - name: Install CUDA Toolkit
+        if: matrix.name == 'cuda'
+        run: |
+          pacman -S --noconfirm cuda
+          echo "/opt/cuda/bin" >> $GITHUB_PATH
+        env:
+          PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/cuda/bin
+      
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: arch-cargo-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            arch-cargo-${{ matrix.name }}-
+      
+      - name: Build
+        run: cargo build --release --features ${{ matrix.features }}
+        env:
+          PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.cargo/bin:/opt/cuda/bin
+      
+      - name: Package
+        run: |
+          strip target/release/vype
+          tar -czvf vype-${{ github.ref_name }}-x86_64-arch-${{ matrix.name }}.tar.gz -C target/release vype
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vype-arch-${{ matrix.name }}
           path: vype-*.tar.gz
 
   release:
-    needs: build
+    needs: [build-ubuntu, build-arch]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -84,7 +143,9 @@ jobs:
             --repo ${{ github.repository }} \
             --title "${{ github.ref_name }}" \
             --generate-notes \
-            artifacts/vype-vulkan/*.tar.gz \
-            artifacts/vype-cuda/*.tar.gz
+            artifacts/vype-ubuntu-vulkan/*.tar.gz \
+            artifacts/vype-ubuntu-cuda/*.tar.gz \
+            artifacts/vype-arch-vulkan/*.tar.gz \
+            artifacts/vype-arch-cuda/*.tar.gz
         env:
           GH_TOKEN: ${{ github.token }}
