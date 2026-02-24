@@ -36,6 +36,7 @@ fn main() -> Result<()> {
     let r = running.clone();
     ctrlc::set_handler(move || {
         r.store(false, Ordering::SeqCst);
+        std::process::exit(0);
     })?;
 
     let recording = Arc::new(AtomicBool::new(false));

@@ -6,8 +6,8 @@ license = "GPL-2.0-only"
 
 [features]
 default = []
-vulkan = ["whisper-rs/vulkan"]
-cuda = ["whisper-rs/cuda"]
+vulkan = ["dep:whisper-rs", "whisper-rs/vulkan"]
+cuda = ["dep:whisper-rs", "whisper-rs/cuda"]
 
 [dependencies]
 cpal = "0.15"
