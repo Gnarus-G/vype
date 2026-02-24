@@ -7,9 +7,8 @@ license = "GPL-2.0-only"
 [features]
 default = []
 cpu = ["dep:whisper-rs"]
-vulkan = ["cpu", "whisper-rs/vulkan"]
-cuda = ["cpu"]
-cuda-accel = ["cuda", "whisper-rs/cuda"]
+vulkan = ["dep:whisper-rs", "whisper-rs/vulkan"]
+cuda = ["dep:whisper-rs", "whisper-rs/cuda"]
 
 [dependencies]
 cpal = "0.15"

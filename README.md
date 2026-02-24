@@ -127,6 +127,8 @@ vype -m /path/to/ggml-small.en.bin
 
 ### Build Commands
 
+Enable exactly one backend feature per build: `cpu`, `vulkan`, or `cuda`.
+
 ```bash
 # Clone the repository
 git clone https://github.com/gnarus-g/vype.git
@@ -139,9 +141,6 @@ cargo build --release --features cpu
 cargo build --release --features vulkan
 
 # CUDA build (NVIDIA GPUs only, requires CUDA Toolkit)
-cargo build --release --features cuda-accel
-
-# Compatibility mode for older `--features cuda` scripts (uses CPU backend)
 cargo build --release --features cuda
 
 # The binary will be at target/release/vype
