@@ -23,7 +23,7 @@ check_runtime_deps() {
         echo "" >&2
         echo "Install with:" >&2
         if [ -f /etc/arch-release ]; then
-            echo "  sudo pacman -S libxdo alsa-lib" >&2
+            echo "  sudo pacman -S xdotool alsa-lib" >&2
         else
             echo "  sudo apt install libxdo-dev libasound2-dev" >&2
         fi
