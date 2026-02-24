@@ -20,36 +20,49 @@ Push-to-talk speech-to-text application that types transcribed text directly int
 ### System Libraries
 
 **Arch Linux:**
+
 ```bash
 sudo pacman -S xdotool vulkan-tools
 ```
 
 **Ubuntu/Debian:**
+
 ```bash
 sudo apt install libxdo-dev libvulkan1
 ```
 
 **Fedora:**
+
 ```bash
 sudo dnf install libxdo-devel vulkan-loader
 ```
 
 ## Installation
 
-### Download Binary
+### Quick Install
 
-Download the latest release for your GPU from [GitHub Releases](https://github.com/gnarus-g/vype/releases):
+```bash
+curl -fsSL https://raw.githubusercontent.com/gnarus-g/vype/main/install.sh | bash
+```
+
+Options:
+
+- `VYPE_GPU=cuda` — Force CUDA backend (default: auto-detect)
+- `INSTALL_DIR=/path` — Custom install directory (default: `~/.local/bin`)
+- `VERSION=v0.1.0` — Install specific version (default: latest)
+
+Example:
+
+```bash
+VYPE_GPU=cuda INSTALL_DIR=~/bin curl -fsSL https://raw.githubusercontent.com/gnarus-g/vype/main/install.sh | bash
+```
+
+### Manual Download
+
+Download from [GitHub Releases](https://github.com/gnarus-g/vype/releases):
 
 - `vype-vX.X.X-x86_64-linux-vulkan.tar.gz` — For AMD, NVIDIA, or Intel GPUs
 - `vype-vX.X.X-x86_64-linux-cuda.tar.gz` — For NVIDIA GPUs only (may be faster)
-
-```bash
-# Extract
-tar -xzf vype-*.tar.gz
-
-# Run
-./vype
-```
 
 ## Usage
 
@@ -80,19 +93,19 @@ Options:
 
 ### Model Sizes
 
-| Size   | Disk Space | Quality | Speed     |
-|--------|------------|---------|-----------|
-| tiny   | 75 MB      | Lowest  | Fastest   |
-| base   | 142 MB     | Low     | Fast      |
-| small  | 466 MB     | Good    | Medium    |
-| medium | 1.5 GB     | Better  | Slower    |
-| large  | 2.9 GB     | Best    | Slowest   |
+| Size   | Disk Space | Quality | Speed   |
+| ------ | ---------- | ------- | ------- |
+| tiny   | 75 MB      | Lowest  | Fastest |
+| base   | 142 MB     | Low     | Fast    |
+| small  | 466 MB     | Good    | Medium  |
+| medium | 1.5 GB     | Better  | Slower  |
+| large  | 2.9 GB     | Best    | Slowest |
 
 ### Examples
 
 ```bash
 # Use a larger model for better accuracy
-vype -s medium
+vype -s large # or medium
 
 # Use F8 as the push-to-talk key
 vype -k F8
