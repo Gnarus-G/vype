@@ -8,10 +8,14 @@ pub enum AudioMsg {
     StopRecording {
         reply_to: crate::actors::ActorRef<Vec<f32>>,
     },
+    GetSamples {
+        reply_to: crate::actors::ActorRef<Vec<f32>>,
+    },
 }
 
 pub struct AudioActor<S: AudioSource + Send + 'static> {
     source: S,
+    #[allow(dead_code)]
     max_duration: Duration,
 }
 
@@ -33,6 +37,10 @@ impl<S: AudioSource + Send + 'static> Actor<AudioMsg> for AudioActor<S> {
                 }
                 AudioMsg::StopRecording { reply_to } => {
                     let samples = self.source.stop();
+                    let _ = reply_to.send(samples);
+                }
+                AudioMsg::GetSamples { reply_to } => {
+                    let samples = self.source.get_current_samples();
                     let _ = reply_to.send(samples);
                 }
             }

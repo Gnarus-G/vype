@@ -15,7 +15,7 @@ impl XdoKeyboardSink {
 
 impl KeyboardSink for XdoKeyboardSink {
     fn type_text(&mut self, text: &str) {
-        let _ = self.xdo.enter_text(text, 1000);
+        let _ = self.xdo.enter_text(text, 5000);
     }
 }
 

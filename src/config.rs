@@ -22,6 +22,14 @@ pub struct Config {
         value_name = "SEC"
     )]
     pub max_duration_secs: u64,
+
+    #[arg(
+        short = 'p',
+        long = "partial-interval",
+        default_value = "2.0",
+        value_name = "SECS"
+    )]
+    pub partial_interval_secs: f64,
 }
 
 impl Config {
@@ -42,6 +50,7 @@ impl Default for Config {
             key: "F12".to_string(),
             language: "en".to_string(),
             max_duration_secs: 30,
+            partial_interval_secs: 2.0,
         }
     }
 }

@@ -105,4 +105,8 @@ impl AudioSource for CpalAudioSource {
     fn channels(&self) -> u16 {
         self.channels
     }
+
+    fn get_current_samples(&self) -> Vec<f32> {
+        self.buffer.lock().unwrap().clone()
+    }
 }

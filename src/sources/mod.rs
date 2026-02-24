@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Clone)]
 pub enum SourceError {
     #[error("Audio source error: {0}")]
     Audio(String),
@@ -14,10 +14,65 @@ pub trait AudioSource {
     fn stop(&mut self) -> Vec<f32>;
     fn sample_rate(&self) -> u32;
     fn channels(&self) -> u16;
+    fn get_current_samples(&self) -> Vec<f32>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KeyOp {
+    Backspace(usize),
+    Delete(usize),
+    Type(char),
+    Left(usize),
+    Right(usize),
 }
 
 pub trait KeyboardSink {
     fn type_text(&mut self, text: &str);
+    fn execute_ops(&mut self, ops: &[KeyOp]) {
+        for op in ops {
+            match op {
+                KeyOp::Backspace(n) => {
+                    for _ in 0..*n {
+                        self.backspace();
+                    }
+                }
+                KeyOp::Delete(n) => {
+                    for _ in 0..*n {
+                        self.delete();
+                    }
+                }
+                KeyOp::Type(c) => {
+                    self.type_text(&c.to_string());
+                }
+                KeyOp::Left(n) => {
+                    for _ in 0..*n {
+                        self.left();
+                    }
+                }
+                KeyOp::Right(n) => {
+                    for _ in 0..*n {
+                        self.right();
+                    }
+                }
+            }
+        }
+    }
+
+    fn backspace(&mut self) {
+        self.type_text("\x08");
+    }
+
+    fn delete(&mut self) {
+        self.type_text("\x7F");
+    }
+
+    fn left(&mut self) {
+        self.type_text("\x1B[D");
+    }
+
+    fn right(&mut self) {
+        self.type_text("\x1B[C");
+    }
 }
 
 pub trait Transcriber {

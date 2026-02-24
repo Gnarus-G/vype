@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use clap::Parser;
@@ -7,6 +8,8 @@ use env_logger::Env;
 use rdev::{listen, Event, EventType, Key};
 
 use vype::config::Config;
+use vype::pure::typing_state::TypingState;
+
 #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::sources::AudioSource;
 #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
@@ -30,6 +33,10 @@ fn main() -> Result<()> {
         "Vype started. Press and hold {} to record, release to transcribe.",
         config.key
     );
+    log::info!(
+        "Partial transcription interval: {}s",
+        config.partial_interval_secs
+    );
     log::info!("Press Ctrl+C to exit.");
 
     let running = Arc::new(AtomicBool::new(true));
@@ -41,10 +48,16 @@ fn main() -> Result<()> {
 
     let recording = Arc::new(AtomicBool::new(false));
     let ptt_key = parse_ptt_key(&config.key);
+    let partial_interval = Duration::from_secs_f64(config.partial_interval_secs);
 
     let (tx, rx) = std::sync::mpsc::channel();
     let tx_clone = tx.clone();
     let recording_clone = recording.clone();
+    let recording_for_timer = recording.clone();
+    let tx_for_timer = tx.clone();
+    let running_for_audio = running.clone();
+    let running_for_timer = running.clone();
+
     #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
     let (model_opt, model_size_opt, language_opt) = (
         config.model.clone(),
@@ -54,35 +67,31 @@ fn main() -> Result<()> {
 
     std::thread::spawn(move || {
         #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
-        let mut sink = XdoKeyboardSink::new().expect("Failed to create xdo keyboard");
+        {
+            let mut sink = XdoKeyboardSink::new().expect("Failed to create xdo keyboard");
 
-        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
-        let model_path = get_model_path(model_opt.as_deref(), model_size_opt.as_deref())
-            .expect("Failed to get model");
+            let model_path = get_model_path(model_opt.as_deref(), model_size_opt.as_deref())
+                .expect("Failed to get model");
 
-        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
-        let mut audio_source = CpalAudioSource::new().expect("Failed to create audio source");
+            let mut audio_source = CpalAudioSource::new().expect("Failed to create audio source");
 
-        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
-        let transcriber = WhisperTranscriber::new(model_path.to_str().unwrap(), &language_opt)
-            .expect("Failed to create transcriber");
+            let transcriber = WhisperTranscriber::new(model_path.to_str().unwrap(), &language_opt)
+                .expect("Failed to create transcriber");
 
-        while running.load(Ordering::SeqCst) {
-            if let Ok(msg) = rx.recv_timeout(std::time::Duration::from_millis(50)) {
-                match msg {
-                    AppMsg::StartRecording => {
-                        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
-                        {
+            let mut typing_state = TypingState::new();
+
+            while running_for_audio.load(Ordering::SeqCst) {
+                if let Ok(msg) = rx.recv_timeout(Duration::from_millis(50)) {
+                    match msg {
+                        AppMsg::StartRecording => {
+                            typing_state.clear();
                             if let Err(e) = audio_source.start() {
                                 log::error!("Error starting audio: {}", e);
                             } else {
                                 log::info!("Recording started...");
                             }
                         }
-                    }
-                    AppMsg::StopRecording => {
-                        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
-                        {
+                        AppMsg::StopRecording => {
                             let samples = audio_source.stop();
                             log::info!("Recording stopped. Samples: {}", samples.len());
                             if !samples.is_empty() {
@@ -101,15 +110,54 @@ fn main() -> Result<()> {
                                     Ok(text) => {
                                         log::info!("Transcribed: {}", text);
                                         if !text.is_empty() {
-                                            sink.type_text(&text);
+                                            let ops = typing_state.transition(&text);
+                                            sink.execute_ops(&ops);
                                         }
                                     }
                                     Err(e) => log::error!("Transcription error: {}", e),
+                                }
+                            } else {
+                                typing_state.clear();
+                            }
+                        }
+                        AppMsg::PartialTranscribe => {
+                            let samples = audio_source.get_current_samples();
+                            if !samples.is_empty() {
+                                let resampled = resample_to_16khz_mono(
+                                    &samples,
+                                    audio_source.sample_rate(),
+                                    audio_source.channels(),
+                                );
+                                match transcriber.transcribe(&resampled) {
+                                    Ok(text) => {
+                                        if !text.is_empty() {
+                                            log::debug!("Partial: {}", text);
+                                            let ops = typing_state.transition(&text);
+                                            sink.execute_ops(&ops);
+                                        }
+                                    }
+                                    Err(e) => log::error!("Partial transcription error: {}", e),
                                 }
                             }
                         }
                     }
                 }
+            }
+        }
+
+        #[cfg(not(any(feature = "cpu", feature = "vulkan", feature = "cuda")))]
+        {
+            while running_for_audio.load(Ordering::SeqCst) {
+                let _ = rx.recv_timeout(Duration::from_millis(50));
+            }
+        }
+    });
+
+    std::thread::spawn(move || {
+        while running_for_timer.load(Ordering::SeqCst) {
+            std::thread::sleep(partial_interval);
+            if recording_for_timer.load(Ordering::SeqCst) {
+                let _ = tx_for_timer.send(AppMsg::PartialTranscribe);
             }
         }
     });
@@ -149,6 +197,7 @@ fn main() -> Result<()> {
 enum AppMsg {
     StartRecording,
     StopRecording,
+    PartialTranscribe,
 }
 
 fn parse_ptt_key(key: &str) -> Key {

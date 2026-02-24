@@ -4,9 +4,10 @@ use vype::config::Config;
 fn config_has_default_values() {
     let config = Config::parse_from::<_, &str>([]);
 
-    assert_eq!(config.key, "F13");
+    assert_eq!(config.key, "F12");
     assert_eq!(config.language, "en");
     assert_eq!(config.max_duration_secs, 30);
+    assert_eq!(config.partial_interval_secs, 2.0);
 }
 
 #[test]
@@ -14,23 +15,23 @@ fn config_parses_custom_values() {
     let config = Config::parse_from([
         "vype",
         "--key",
-        "F14",
+        "F11",
         "--language",
         "es",
         "--max-duration",
         "60",
     ]);
 
-    assert_eq!(config.key, "F14");
+    assert_eq!(config.key, "F11");
     assert_eq!(config.language, "es");
     assert_eq!(config.max_duration_secs, 60);
 }
 
 #[test]
 fn config_parses_short_flags() {
-    let config = Config::parse_from(["vype", "-k", "F15", "-l", "de", "-d", "45"]);
+    let config = Config::parse_from(["vype", "-k", "F11", "-l", "de", "-d", "45"]);
 
-    assert_eq!(config.key, "F15");
+    assert_eq!(config.key, "F11");
     assert_eq!(config.language, "de");
     assert_eq!(config.max_duration_secs, 45);
 }
@@ -40,4 +41,13 @@ fn config_model_path_default() {
     let config = Config::parse_from::<_, &str>([]);
 
     assert!(config.model.is_none());
+}
+
+#[test]
+fn config_parses_partial_interval() {
+    let config = Config::parse_from(["vype", "-p", "1.5"]);
+    assert_eq!(config.partial_interval_secs, 1.5);
+
+    let config = Config::parse_from(["vype", "--partial-interval", "3.0"]);
+    assert_eq!(config.partial_interval_secs, 3.0);
 }

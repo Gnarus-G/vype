@@ -20,6 +20,10 @@ fn audio_source_trait_has_required_methods() {
         fn channels(&self) -> u16 {
             1
         }
+
+        fn get_current_samples(&self) -> Vec<f32> {
+            vec![]
+        }
     }
 
     let mut source = MockAudioSource;

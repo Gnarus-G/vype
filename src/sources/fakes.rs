@@ -41,6 +41,10 @@ impl AudioSource for FakeAudioSource {
     fn channels(&self) -> u16 {
         self.channels
     }
+
+    fn get_current_samples(&self) -> Vec<f32> {
+        self.samples.clone()
+    }
 }
 
 #[derive(Clone)]
