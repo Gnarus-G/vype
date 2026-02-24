@@ -27,7 +27,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxdo-dev libvulkan-dev libxi-dev libxtst-dev
+          sudo apt-get install -y libxdo-dev libvulkan-dev libxi-dev libxtst-dev libasound2-dev
       
       - name: Install CUDA Toolkit
         if: matrix.name == 'cuda'
