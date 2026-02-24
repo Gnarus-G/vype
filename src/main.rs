@@ -8,6 +8,8 @@ use env_logger::Env;
 use rdev::{listen, Event, EventType, Key};
 
 use vype::config::Config;
+
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::pure::typing_state::TypingState;
 
 #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]

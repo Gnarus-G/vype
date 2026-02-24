@@ -34,6 +34,23 @@ fn stereo_to_mono(samples: &[f32], channels: usize) -> Vec<f32> {
 fn resample(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
     let chunk_size = 1024;
 
+    if samples.len() < chunk_size {
+        let ratio = to_rate as f64 / from_rate as f64;
+        let output_len = (samples.len() as f64 * ratio) as usize;
+        let mut output = Vec::with_capacity(output_len);
+        for i in 0..output_len {
+            let src_idx = i as f64 / ratio;
+            let idx = src_idx as usize;
+            let frac = src_idx - idx as f64;
+            if idx + 1 < samples.len() {
+                output.push(samples[idx] * (1.0 - frac as f32) + samples[idx + 1] * frac as f32);
+            } else if idx < samples.len() {
+                output.push(samples[idx]);
+            }
+        }
+        return output;
+    }
+
     let mut resampler = FftFixedIn::<f32>::new(
         from_rate as usize,
         to_rate as usize,

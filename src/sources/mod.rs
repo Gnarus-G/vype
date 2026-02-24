@@ -29,30 +29,44 @@ pub enum KeyOp {
 pub trait KeyboardSink {
     fn type_text(&mut self, text: &str);
     fn execute_ops(&mut self, ops: &[KeyOp]) {
-        for op in ops {
-            match op {
+        let mut i = 0;
+        while i < ops.len() {
+            match &ops[i] {
                 KeyOp::Backspace(n) => {
-                    for _ in 0..*n {
-                        self.backspace();
-                    }
+                    let backspaces = "\x08".repeat(*n);
+                    self.type_text(&backspaces);
+                    i += 1;
                 }
                 KeyOp::Delete(n) => {
-                    for _ in 0..*n {
-                        self.delete();
-                    }
+                    let deletes = "\x7F".repeat(*n);
+                    self.type_text(&deletes);
+                    i += 1;
                 }
                 KeyOp::Type(c) => {
-                    self.type_text(&c.to_string());
+                    let mut text = String::new();
+                    text.push(*c);
+                    i += 1;
+                    while i < ops.len() {
+                        if let KeyOp::Type(next_c) = &ops[i] {
+                            text.push(*next_c);
+                            i += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    self.type_text(&text);
                 }
                 KeyOp::Left(n) => {
                     for _ in 0..*n {
                         self.left();
                     }
+                    i += 1;
                 }
                 KeyOp::Right(n) => {
                     for _ in 0..*n {
                         self.right();
                     }
+                    i += 1;
                 }
             }
         }

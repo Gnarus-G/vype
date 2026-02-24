@@ -48,5 +48,24 @@ fn keyboard_sink_executes_key_ops() {
     sink.execute_ops(&ops);
 
     let captured = sink.captured();
-    assert_eq!(captured, vec!["a", "b", "\x08"]);
+    assert_eq!(captured, vec!["ab", "\x08"]);
+}
+
+#[test]
+fn keyboard_sink_batches_consecutive_types() {
+    let mut sink = CaptureKeyboardSink::new();
+
+    let ops = vec![
+        KeyOp::Type('h'),
+        KeyOp::Type('e'),
+        KeyOp::Type('l'),
+        KeyOp::Type('l'),
+        KeyOp::Type('o'),
+        KeyOp::Backspace(2),
+        KeyOp::Type('!'),
+    ];
+    sink.execute_ops(&ops);
+
+    let captured = sink.captured();
+    assert_eq!(captured, vec!["hello", "\x08\x08", "!"]);
 }

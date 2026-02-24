@@ -32,8 +32,5 @@ fn keyboard_actor_orchestrates_flow_on_ptt_release() {
     std::thread::sleep(Duration::from_millis(100));
 
     let captured = audio_ref.captured();
-    assert_eq!(
-        captured,
-        vec!["h", "e", "l", "l", "o", " ", "w", "o", "r", "l", "d"]
-    );
+    assert_eq!(captured, vec!["hello world"]);
 }
