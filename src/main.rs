@@ -7,18 +7,18 @@ use env_logger::Env;
 use rdev::{listen, Event, EventType, Key};
 
 use vype::config::Config;
-#[cfg(any(feature = "vulkan", feature = "cuda"))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::sources::AudioSource;
-#[cfg(any(feature = "vulkan", feature = "cuda"))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::sources::CpalAudioSource;
 
-#[cfg(any(feature = "vulkan", feature = "cuda"))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::sources::{KeyboardSink, Transcriber, WhisperTranscriber, XdoKeyboardSink};
 
-#[cfg(any(feature = "vulkan", feature = "cuda"))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::model::get_model_path;
 
-#[cfg(any(feature = "vulkan", feature = "cuda"))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::pure::resample::resample_to_16khz_mono;
 
 fn main() -> Result<()> {
@@ -45,7 +45,7 @@ fn main() -> Result<()> {
     let (tx, rx) = std::sync::mpsc::channel();
     let tx_clone = tx.clone();
     let recording_clone = recording.clone();
-    #[cfg(any(feature = "vulkan", feature = "cuda"))]
+    #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
     let (model_opt, model_size_opt, language_opt) = (
         config.model.clone(),
         config.model_size.clone(),
@@ -53,17 +53,17 @@ fn main() -> Result<()> {
     );
 
     std::thread::spawn(move || {
-        #[cfg(any(feature = "vulkan", feature = "cuda"))]
+        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
         let mut sink = XdoKeyboardSink::new().expect("Failed to create xdo keyboard");
 
-        #[cfg(any(feature = "vulkan", feature = "cuda"))]
+        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
         let model_path = get_model_path(model_opt.as_deref(), model_size_opt.as_deref())
             .expect("Failed to get model");
 
-        #[cfg(any(feature = "vulkan", feature = "cuda"))]
+        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
         let mut audio_source = CpalAudioSource::new().expect("Failed to create audio source");
 
-        #[cfg(any(feature = "vulkan", feature = "cuda"))]
+        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
         let transcriber = WhisperTranscriber::new(model_path.to_str().unwrap(), &language_opt)
             .expect("Failed to create transcriber");
 
@@ -71,7 +71,7 @@ fn main() -> Result<()> {
             if let Ok(msg) = rx.recv_timeout(std::time::Duration::from_millis(50)) {
                 match msg {
                     AppMsg::StartRecording => {
-                        #[cfg(any(feature = "vulkan", feature = "cuda"))]
+                        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
                         {
                             if let Err(e) = audio_source.start() {
                                 log::error!("Error starting audio: {}", e);
@@ -81,7 +81,7 @@ fn main() -> Result<()> {
                         }
                     }
                     AppMsg::StopRecording => {
-                        #[cfg(any(feature = "vulkan", feature = "cuda"))]
+                        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
                         {
                             let samples = audio_source.stop();
                             log::info!("Recording stopped. Samples: {}", samples.len());

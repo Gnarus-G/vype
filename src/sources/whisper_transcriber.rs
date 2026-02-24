@@ -1,17 +1,22 @@
 use crate::sources::{SourceError, Transcriber};
 
-#[cfg(any(feature = "vulkan", feature = "cuda"))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 pub struct WhisperTranscriber {
-    #[cfg(any(feature = "vulkan", feature = "cuda"))]
+    #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
     ctx: WhisperContext,
     language: String,
 }
 
 impl WhisperTranscriber {
-    #[cfg(any(feature = "vulkan", feature = "cuda"))]
+    #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
     pub fn new(model_path: &str, language: &str) -> Result<Self, SourceError> {
+        #[cfg(all(feature = "cuda", not(feature = "cuda-accel")))]
+        log::warn!(
+            "`cuda` feature enabled without CUDA toolkit acceleration; using CPU backend. Use `--features cuda-accel` for true CUDA builds."
+        );
+
         let ctx_params = WhisperContextParameters::default();
         let ctx = WhisperContext::new_with_params(model_path, ctx_params)
             .map_err(|e| SourceError::Transcription(format!("Failed to load model: {}", e)))?;
@@ -21,17 +26,16 @@ impl WhisperTranscriber {
         })
     }
 
-    #[cfg(not(any(feature = "vulkan", feature = "cuda")))]
+    #[cfg(not(any(feature = "cpu", feature = "vulkan", feature = "cuda")))]
     pub fn new(_model_path: &str, _language: &str) -> Result<Self, SourceError> {
         Err(SourceError::Transcription(
-            "GPU feature not enabled. Recompile with --features vulkan or --features cuda"
-                .to_string(),
+            "Transcription backend not enabled. Recompile with --features cpu, --features vulkan, or --features cuda-accel".to_string(),
         ))
     }
 }
 
 impl Transcriber for WhisperTranscriber {
-    #[cfg(any(feature = "vulkan", feature = "cuda"))]
+    #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
     fn transcribe(&self, audio: &[f32]) -> Result<String, SourceError> {
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         params.set_language(Some(&self.language));
@@ -58,10 +62,10 @@ impl Transcriber for WhisperTranscriber {
         Ok(result.trim().to_string())
     }
 
-    #[cfg(not(any(feature = "vulkan", feature = "cuda")))]
+    #[cfg(not(any(feature = "cpu", feature = "vulkan", feature = "cuda")))]
     fn transcribe(&self, _audio: &[f32]) -> Result<String, SourceError> {
         Err(SourceError::Transcription(
-            "GPU feature not enabled".to_string(),
+            "Transcription backend not enabled".to_string(),
         ))
     }
 }

@@ -5,16 +5,17 @@ Push-to-talk speech-to-text application that types transcribed text directly int
 ## Features
 
 - **Push-to-talk**: Hold a key to record, release to transcribe and type
-- **GPU-accelerated**: Uses Vulkan (AMD, NVIDIA, Intel) or CUDA (NVIDIA) for fast Whisper transcription
+- **Flexible backends**: CPU works everywhere, with optional Vulkan (AMD/NVIDIA/Intel) or CUDA (NVIDIA) acceleration
 - **Auto-model download**: Downloads the Whisper model from HuggingFace on first run
 - **Configurable**: Custom PTT key, language, model size, and recording duration
 
 ## System Requirements
 
-### GPU
+### Acceleration Backends
 
+- **CPU build**: Works on any x86_64 Linux system
 - **Vulkan build**: Any GPU with Vulkan support (AMD, NVIDIA, Intel)
-- **CUDA build**: NVIDIA GPU only
+- **CUDA build**: NVIDIA GPU + CUDA Toolkit
 
 ### System Libraries
 
@@ -53,7 +54,7 @@ tar -xzf vype-*.tar.gz
 ## Usage
 
 ```bash
-# Run with Vulkan (default if no feature specified during build)
+# Run (CPU backend)
 vype
 
 # Press and hold F12 to record, release to transcribe
@@ -108,7 +109,7 @@ vype -m /path/to/ggml-small.en.bin
 ### Prerequisites
 
 - Rust 1.70+
-- Vulkan SDK or CUDA Toolkit
+- Optional for GPU acceleration: Vulkan SDK or CUDA Toolkit
 - libxdo (xdotool)
 
 ### Build Commands
@@ -118,10 +119,16 @@ vype -m /path/to/ggml-small.en.bin
 git clone https://github.com/gnarus-g/vype.git
 cd vype
 
+# CPU build (works everywhere)
+cargo build --release --features cpu
+
 # Vulkan build (AMD, NVIDIA, Intel GPUs)
 cargo build --release --features vulkan
 
-# CUDA build (NVIDIA GPUs only)
+# CUDA build (NVIDIA GPUs only, requires CUDA Toolkit)
+cargo build --release --features cuda-accel
+
+# Compatibility mode for older `--features cuda` scripts (uses CPU backend)
 cargo build --release --features cuda
 
 # The binary will be at target/release/vype

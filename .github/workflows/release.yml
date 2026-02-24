@@ -17,7 +17,7 @@ jobs:
           - name: vulkan
             features: vulkan
           - name: cuda
-            features: cuda
+            features: cuda-accel
     
     steps:
       - name: Checkout
