@@ -6,7 +6,7 @@ pub struct Config {
     #[arg(short = 'm', long, value_name = "PATH")]
     pub model: Option<String>,
 
-    #[arg(short = 'k', long, default_value = "F13", value_name = "KEY")]
+    #[arg(short = 'k', long, default_value = "F12", value_name = "KEY")]
     pub key: String,
 
     #[arg(short = 'l', long, default_value = "en", value_name = "LANG")]
@@ -35,7 +35,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             model: None,
-            key: "F13".to_string(),
+            key: "F12".to_string(),
             language: "en".to_string(),
             max_duration_secs: 30,
         }

@@ -33,12 +33,12 @@ fn keyboard_sink_trait_has_type_method() {
     struct MockKeyboardSink;
 
     impl KeyboardSink for MockKeyboardSink {
-        fn type_text(&self, _text: &str) {
+        fn type_text(&mut self, _text: &str) {
             // no-op
         }
     }
 
-    let sink = MockKeyboardSink;
+    let mut sink = MockKeyboardSink;
     sink.type_text("hello");
 }
 

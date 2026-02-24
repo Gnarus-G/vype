@@ -1,50 +1,33 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 
 use anyhow::Result;
 use clap::Parser;
+use env_logger::Env;
 use rdev::{listen, Event, EventType, Key};
 
 use vype::config::Config;
-use vype::sources::fakes::{FakeAudioSource, MockTranscriber};
-use vype::sources::{AudioSource, Transcriber};
-
 #[cfg(feature = "transcription")]
-use vype::sources::WhisperTranscriber;
-
-#[cfg(feature = "transcription")]
-use vype::sources::RdevKeyboardSink;
-
+use vype::sources::AudioSource;
 #[cfg(feature = "transcription")]
 use vype::sources::CpalAudioSource;
+
+#[cfg(feature = "transcription")]
+use vype::sources::{KeyboardSink, Transcriber, WhisperTranscriber, XdoKeyboardSink};
 
 #[cfg(feature = "transcription")]
 use vype::model::get_model_path;
 
 fn main() -> Result<()> {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+
     let config = Config::parse();
 
-    #[cfg(feature = "transcription")]
-    let model_path = get_model_path(config.model.as_deref())?;
-
-    #[cfg(feature = "transcription")]
-    let audio_source = CpalAudioSource::new()?;
-
-    #[cfg(not(feature = "transcription"))]
-    let audio_source = FakeAudioSource::new(vec![0.0; 16000], 16000, 1);
-
-    #[cfg(feature = "transcription")]
-    let transcriber = WhisperTranscriber::new(model_path.to_str().unwrap(), &config.language)?;
-
-    #[cfg(not(feature = "transcription"))]
-    let transcriber = MockTranscriber::new("[transcription disabled]".to_string());
-
-    println!(
+    log::info!(
         "Vype started. Press and hold {} to record, release to transcribe.",
         config.key
     );
-    println!("Press Ctrl+C to exit.");
+    log::info!("Press Ctrl+C to exit.");
 
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
@@ -58,34 +41,49 @@ fn main() -> Result<()> {
     let (tx, rx) = std::sync::mpsc::channel();
     let tx_clone = tx.clone();
     let recording_clone = recording.clone();
+    let _model_opt = config.model.clone();
+    let _language_opt = config.language.clone();
+
+    #[cfg(feature = "transcription")]
+    let mut sink = XdoKeyboardSink::new().expect("Failed to create xdo keyboard");
 
     std::thread::spawn(move || {
-        let mut audio_source = audio_source;
-        let transcriber = transcriber;
+        #[cfg(feature = "transcription")]
+        let model_path = get_model_path(model_opt.as_deref()).expect("Failed to get model");
+
+        #[cfg(feature = "transcription")]
+        let mut audio_source = CpalAudioSource::new().expect("Failed to create audio source");
+
+        #[cfg(feature = "transcription")]
+        let transcriber = WhisperTranscriber::new(model_path.to_str().unwrap(), &language_opt)
+            .expect("Failed to create transcriber");
 
         while running.load(Ordering::SeqCst) {
-            if let Ok(msg) = rx.recv_timeout(Duration::from_millis(50)) {
+            if let Ok(msg) = rx.recv_timeout(std::time::Duration::from_millis(50)) {
                 match msg {
                     AppMsg::StartRecording => {
-                        let _ = audio_source.start();
+                        #[cfg(feature = "transcription")]
+                        {
+                            if let Err(e) = audio_source.start() {
+                                log::error!("Error starting audio: {}", e);
+                            } else {
+                                log::info!("Recording started...");
+                            }
+                        }
                     }
                     AppMsg::StopRecording => {
-                        let samples = audio_source.stop();
-                        if !samples.is_empty() {
-                            match transcriber.transcribe(&samples) {
-                                Ok(text) => {
-                                    #[cfg(not(feature = "transcription"))]
-                                    {
-                                        println!("Transcribed: {}", text);
-                                    }
-                                    #[cfg(feature = "transcription")]
-                                    {
-                                        println!("Transcribed: {}", text);
-                                        let sink = RdevKeyboardSink::new();
+                        #[cfg(feature = "transcription")]
+                        {
+                            let samples = audio_source.stop();
+                            log::info!("Recording stopped. Samples: {}", samples.len());
+                            if !samples.is_empty() {
+                                match transcriber.transcribe(&samples) {
+                                    Ok(text) => {
+                                        log::info!("Transcribed: {}", text);
                                         sink.type_text(&text);
                                     }
+                                    Err(e) => log::error!("Transcription error: {}", e),
                                 }
-                                Err(e) => eprintln!("Transcription error: {}", e),
                             }
                         }
                     }
@@ -94,25 +92,34 @@ fn main() -> Result<()> {
         }
     });
 
-    let callback = move |event: Event| match event.event_type {
-        EventType::KeyPress(key) if key == ptt_key => {
-            if !recording_clone.load(Ordering::SeqCst) {
-                recording_clone.store(true, Ordering::SeqCst);
-                let _ = tx_clone.send(AppMsg::StartRecording);
+    log::info!("Starting keyboard listener...");
+
+    let callback = move |event: Event| {
+        let is_key_press = matches!(event.event_type, EventType::KeyPress(_));
+        let is_key_release = matches!(event.event_type, EventType::KeyRelease(_));
+
+        if is_key_press || is_key_release {
+            if let EventType::KeyPress(key) | EventType::KeyRelease(key) = event.event_type {
+                if key == ptt_key {
+                    if is_key_press && !recording_clone.load(Ordering::SeqCst) {
+                        recording_clone.store(true, Ordering::SeqCst);
+                        let _ = tx_clone.send(AppMsg::StartRecording);
+                        log::info!("PTT pressed");
+                    } else if is_key_release && recording_clone.load(Ordering::SeqCst) {
+                        recording_clone.store(false, Ordering::SeqCst);
+                        let _ = tx_clone.send(AppMsg::StopRecording);
+                        log::info!("PTT released");
+                    }
+                }
             }
         }
-        EventType::KeyRelease(key) if key == ptt_key => {
-            if recording_clone.load(Ordering::SeqCst) {
-                recording_clone.store(false, Ordering::SeqCst);
-                let _ = tx_clone.send(AppMsg::StopRecording);
-            }
-        }
-        _ => {}
     };
 
-    if let Err(e) = listen(callback) {
-        eprintln!("Error listening for keyboard events: {:?}", e);
+    if let Err(error) = listen(callback) {
+        log::error!("Listen error: {:?}", error);
     }
+
+    log::info!("Keyboard listener exited");
 
     Ok(())
 }

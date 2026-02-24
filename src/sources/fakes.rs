@@ -67,7 +67,7 @@ impl Default for CaptureKeyboardSink {
 }
 
 impl KeyboardSink for CaptureKeyboardSink {
-    fn type_text(&self, text: &str) {
+    fn type_text(&mut self, text: &str) {
         self.captured.lock().unwrap().push(text.to_string());
     }
 }

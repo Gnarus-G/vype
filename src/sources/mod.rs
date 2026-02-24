@@ -17,7 +17,7 @@ pub trait AudioSource {
 }
 
 pub trait KeyboardSink {
-    fn type_text(&self, text: &str);
+    fn type_text(&mut self, text: &str);
 }
 
 pub trait Transcriber {
@@ -30,7 +30,7 @@ pub mod fakes;
 pub mod cpal_audio;
 
 #[cfg(not(test))]
-pub mod rdev_keyboard;
+pub mod xdo_keyboard;
 
 #[cfg(all(feature = "transcription", not(test)))]
 pub mod whisper_transcriber;
@@ -39,7 +39,7 @@ pub mod whisper_transcriber;
 pub use cpal_audio::CpalAudioSource;
 
 #[cfg(not(test))]
-pub use rdev_keyboard::RdevKeyboardSink;
+pub use xdo_keyboard::XdoKeyboardSink;
 
 #[cfg(all(feature = "transcription", not(test)))]
 pub use whisper_transcriber::WhisperTranscriber;

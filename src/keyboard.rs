@@ -30,7 +30,7 @@ impl KeyboardActor {
 }
 
 impl Actor<KeyboardMsg> for KeyboardActor {
-    fn run(self, receiver: Receiver<KeyboardMsg>) {
+    fn run(mut self, receiver: Receiver<KeyboardMsg>) {
         for msg in receiver.iter() {
             match msg {
                 KeyboardMsg::PTTPressed => {

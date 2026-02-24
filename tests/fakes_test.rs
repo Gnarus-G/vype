@@ -27,7 +27,7 @@ fn fake_audio_source_can_be_started_and_stopped() {
 
 #[test]
 fn capture_keyboard_sink_collects_events() {
-    let sink = vype::sources::fakes::CaptureKeyboardSink::new();
+    let mut sink = vype::sources::fakes::CaptureKeyboardSink::new();
 
     sink.type_text("hello");
     sink.type_text(" ");
