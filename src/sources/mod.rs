@@ -104,6 +104,17 @@ pub mod xdo_keyboard;
 #[cfg(all(any(feature = "cpu", feature = "vulkan", feature = "cuda"), not(test)))]
 pub mod whisper_transcriber;
 
+#[cfg(all(
+    any(
+        feature = "cpu",
+        feature = "vulkan",
+        feature = "cuda",
+        feature = "dbus"
+    ),
+    not(test)
+))]
+pub mod dbus_service;
+
 #[cfg(not(test))]
 pub use cpal_audio::CpalAudioSource;
 

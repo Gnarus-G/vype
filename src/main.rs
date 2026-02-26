@@ -9,22 +9,60 @@ use rdev::{listen, Event, EventType, Key};
 
 use vype::config::Config;
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
+#[cfg(any(
+    feature = "cpu",
+    feature = "vulkan",
+    feature = "cuda",
+    feature = "dbus"
+))]
 use vype::pure::typing_state::TypingState;
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
+#[cfg(any(
+    feature = "cpu",
+    feature = "vulkan",
+    feature = "cuda",
+    feature = "dbus"
+))]
 use vype::sources::AudioSource;
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
+#[cfg(any(
+    feature = "cpu",
+    feature = "vulkan",
+    feature = "cuda",
+    feature = "dbus"
+))]
 use vype::sources::CpalAudioSource;
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
+#[cfg(any(
+    feature = "cpu",
+    feature = "vulkan",
+    feature = "cuda",
+    feature = "dbus"
+))]
 use vype::sources::{KeyboardSink, Transcriber, WhisperTranscriber, XdoKeyboardSink};
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
+#[cfg(any(
+    feature = "cpu",
+    feature = "vulkan",
+    feature = "cuda",
+    feature = "dbus"
+))]
 use vype::model::get_model_path;
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
+#[cfg(any(
+    feature = "cpu",
+    feature = "vulkan",
+    feature = "cuda",
+    feature = "dbus"
+))]
 use vype::pure::resample::resample_to_16khz_mono;
+
+#[cfg(any(
+    feature = "cpu",
+    feature = "vulkan",
+    feature = "cuda",
+    feature = "dbus"
+))]
+use vype::sources::dbus_service::{DbusMsg, Dbusservice};
 
 fn main() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
@@ -60,15 +98,103 @@ fn main() -> Result<()> {
     let running_for_audio = running.clone();
     let running_for_timer = running.clone();
 
-    #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
+    #[cfg(any(
+        feature = "cpu",
+        feature = "vulkan",
+        feature = "cuda",
+        feature = "dbus"
+    ))]
     let (model_opt, model_size_opt, language_opt) = (
         config.model.clone(),
         config.model_size.clone(),
         config.language.clone(),
     );
 
+    #[cfg(any(
+        feature = "cpu",
+        feature = "vulkan",
+        feature = "cuda",
+        feature = "dbus"
+    ))]
+    let (dbus_tx, dbus_rx) = std::sync::mpsc::channel();
+
+    #[cfg(any(
+        feature = "cpu",
+        feature = "vulkan",
+        feature = "cuda",
+        feature = "dbus"
+    ))]
+    let dbus_running = running.clone();
+    #[cfg(any(
+        feature = "cpu",
+        feature = "vulkan",
+        feature = "cuda",
+        feature = "dbus"
+    ))]
+    let dbus_recording = recording.clone();
+    #[cfg(any(
+        feature = "cpu",
+        feature = "vulkan",
+        feature = "cuda",
+        feature = "dbus"
+    ))]
+    let dbus_tx_clone = tx.clone();
+
+    #[cfg(any(
+        feature = "cpu",
+        feature = "vulkan",
+        feature = "cuda",
+        feature = "dbus"
+    ))]
+    {
+        let dbus_service = Dbusservice::new(dbus_tx);
+        if let Err(e) = dbus_service.run() {
+            log::error!("Failed to start D-Bus service: {}", e);
+        } else {
+            log::info!("D-Bus service started. Access via: busctl call tech.bytin.vype /tech/bytin/vype tech.bytin.vype ToggleRecording");
+        }
+
+        std::thread::spawn(move || {
+            while dbus_running.load(Ordering::SeqCst) {
+                if let Ok(msg) = dbus_rx.recv_timeout(Duration::from_millis(50)) {
+                    match msg {
+                        DbusMsg::StartRecording => {
+                            if !dbus_recording.load(Ordering::SeqCst) {
+                                dbus_recording.store(true, Ordering::SeqCst);
+                                let _ = dbus_tx_clone.send(AppMsg::StartRecording);
+                                log::info!("D-Bus: Recording started");
+                            }
+                        }
+                        DbusMsg::StopRecording => {
+                            if dbus_recording.load(Ordering::SeqCst) {
+                                dbus_recording.store(false, Ordering::SeqCst);
+                                let _ = dbus_tx_clone.send(AppMsg::StopRecording);
+                                log::info!("D-Bus: Recording stopped");
+                            }
+                        }
+                        DbusMsg::ToggleRecording => {
+                            let currently_recording = dbus_recording.load(Ordering::SeqCst);
+                            dbus_recording.store(!currently_recording, Ordering::SeqCst);
+                            let _ = dbus_tx_clone.send(if currently_recording {
+                                AppMsg::StopRecording
+                            } else {
+                                AppMsg::StartRecording
+                            });
+                            log::info!("D-Bus: Recording toggled to {}", !currently_recording);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     std::thread::spawn(move || {
-        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
+        #[cfg(any(
+            feature = "cpu",
+            feature = "vulkan",
+            feature = "cuda",
+            feature = "dbus"
+        ))]
         {
             let mut sink = XdoKeyboardSink::new().expect("Failed to create xdo keyboard");
 
