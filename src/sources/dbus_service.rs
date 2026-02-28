@@ -37,7 +37,9 @@ impl Dbusservice {
             run_dbus_service(tx, recording, result_tx);
         });
 
-        result_rx.recv()??;
+        result_rx
+            .recv_timeout(Duration::from_secs(10))
+            .map_err(|e| anyhow::anyhow!("D-Bus service startup timed out: {}", e))??;
         Ok(())
     }
 }
@@ -50,19 +52,31 @@ struct Recorder {
 #[zbus::interface(name = "tech.bytin.vype.Recorder")]
 impl Recorder {
     fn start_recording(&self) -> bool {
-        self.is_recording.store(true, Ordering::SeqCst);
-        self.msg_tx.send(DbusMsg::StartRecording).is_ok()
+        if self.msg_tx.send(DbusMsg::StartRecording).is_ok() {
+            self.is_recording.store(true, Ordering::SeqCst);
+            true
+        } else {
+            false
+        }
     }
 
     fn stop_recording(&self) -> bool {
-        self.is_recording.store(false, Ordering::SeqCst);
-        self.msg_tx.send(DbusMsg::StopRecording).is_ok()
+        if self.msg_tx.send(DbusMsg::StopRecording).is_ok() {
+            self.is_recording.store(false, Ordering::SeqCst);
+            true
+        } else {
+            false
+        }
     }
 
     fn toggle_recording(&self) -> bool {
         let new_state = !self.is_recording.load(Ordering::SeqCst);
-        self.is_recording.store(new_state, Ordering::SeqCst);
-        self.msg_tx.send(DbusMsg::ToggleRecording).is_ok()
+        if self.msg_tx.send(DbusMsg::ToggleRecording).is_ok() {
+            self.is_recording.store(new_state, Ordering::SeqCst);
+            true
+        } else {
+            false
+        }
     }
 
     #[zbus(property)]
