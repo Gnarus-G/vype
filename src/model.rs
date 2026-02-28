@@ -2,7 +2,7 @@ use anyhow::Result;
 use hf_hub::api::sync::Api;
 use std::path::PathBuf;
 
-const DEFAULT_MODEL_SIZE: &str = "small";
+const DEFAULT_MODEL_SIZE: &str = "medium";
 
 pub fn get_model_path(custom_path: Option<&str>, model_size: Option<&str>) -> Result<PathBuf> {
     if let Some(path) = custom_path {
