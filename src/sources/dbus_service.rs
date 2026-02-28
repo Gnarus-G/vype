@@ -1,5 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::mpsc::Sender;
 use std::thread;
 use std::time::Duration;
 
@@ -15,28 +14,19 @@ pub enum DbusMsg {
 }
 
 pub struct Dbusservice {
-    msg_tx: std::sync::mpsc::Sender<DbusMsg>,
-    recording: Arc<AtomicBool>,
+    msg_tx: Sender<DbusMsg>,
 }
 
 impl Dbusservice {
-    pub fn new(msg_tx: std::sync::mpsc::Sender<DbusMsg>) -> Self {
-        Self {
-            msg_tx,
-            recording: Arc::new(AtomicBool::new(false)),
-        }
-    }
-
-    pub fn recording_flag(&self) -> Arc<AtomicBool> {
-        self.recording.clone()
+    pub fn new(msg_tx: Sender<DbusMsg>) -> Self {
+        Self { msg_tx }
     }
 
     pub fn run(&self) -> anyhow::Result<()> {
         let tx = self.msg_tx.clone();
-        let recording = self.recording.clone();
 
         thread::spawn(move || {
-            run_dbus_service(tx, recording);
+            run_dbus_service(tx);
         });
 
         Ok(())
@@ -44,8 +34,7 @@ impl Dbusservice {
 }
 
 struct Recorder {
-    recording: Arc<AtomicBool>,
-    msg_tx: std::sync::mpsc::Sender<DbusMsg>,
+    msg_tx: Sender<DbusMsg>,
 }
 
 #[zbus::interface(name = "tech.bytin.vype.Recorder")]
@@ -64,18 +53,10 @@ impl Recorder {
         let _ = self.msg_tx.send(DbusMsg::ToggleRecording);
         true
     }
-
-    #[zbus(property)]
-    fn is_recording(&self) -> bool {
-        self.recording.load(Ordering::SeqCst)
-    }
 }
 
-fn run_dbus_service(tx: std::sync::mpsc::Sender<DbusMsg>, recording: Arc<AtomicBool>) {
-    let recorder = Recorder {
-        recording: recording.clone(),
-        msg_tx: tx,
-    };
+fn run_dbus_service(tx: Sender<DbusMsg>) {
+    let recorder = Recorder { msg_tx: tx };
 
     let result = zbus::blocking::connection::Builder::session()
         .and_then(|b| b.name(SERVICE_NAME))

@@ -9,7 +9,7 @@ default = []
 cpu = ["dep:whisper-rs", "dep:zbus"]
 vulkan = ["dep:whisper-rs", "whisper-rs/vulkan", "dep:zbus"]
 cuda = ["dep:whisper-rs", "whisper-rs/cuda", "dep:zbus"]
-dbus = []
+dbus = ["dep:zbus"]
 
 [dependencies]
 cpal = "0.15"

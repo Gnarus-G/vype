@@ -4,7 +4,6 @@ use vype::config::Config;
 fn config_has_default_values() {
     let config = Config::parse_from::<_, &str>([]);
 
-    assert_eq!(config.key, "F12");
     assert_eq!(config.language, "en");
     assert_eq!(config.max_duration_secs, 30);
     assert_eq!(config.partial_interval_secs, 2.0);
@@ -12,26 +11,16 @@ fn config_has_default_values() {
 
 #[test]
 fn config_parses_custom_values() {
-    let config = Config::parse_from([
-        "vype",
-        "--key",
-        "F11",
-        "--language",
-        "es",
-        "--max-duration",
-        "60",
-    ]);
+    let config = Config::parse_from(["vype", "--language", "es", "--max-duration", "60"]);
 
-    assert_eq!(config.key, "F11");
     assert_eq!(config.language, "es");
     assert_eq!(config.max_duration_secs, 60);
 }
 
 #[test]
 fn config_parses_short_flags() {
-    let config = Config::parse_from(["vype", "-k", "F11", "-l", "de", "-d", "45"]);
+    let config = Config::parse_from(["vype", "-l", "de", "-d", "45"]);
 
-    assert_eq!(config.key, "F11");
     assert_eq!(config.language, "de");
     assert_eq!(config.max_duration_secs, 45);
 }

@@ -274,7 +274,12 @@ fn main() -> Result<()> {
             }
         }
 
-        #[cfg(not(any(feature = "cpu", feature = "vulkan", feature = "cuda")))]
+        #[cfg(not(any(
+            feature = "cpu",
+            feature = "vulkan",
+            feature = "cuda",
+            feature = "dbus"
+        )))]
         {
             while running_for_audio.load(Ordering::SeqCst) {
                 let _ = rx.recv_timeout(Duration::from_millis(50));
