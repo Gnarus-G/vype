@@ -163,6 +163,7 @@ fn main() -> Result<()> {
                                 dbus_recording.store(true, Ordering::SeqCst);
                                 let _ = dbus_tx_clone.send(AppMsg::StartRecording);
                                 log::info!("D-Bus: Recording started");
+                                send_notification("🎤 Listening...");
                             }
                         }
                         DbusMsg::StopRecording => {
@@ -170,6 +171,7 @@ fn main() -> Result<()> {
                                 dbus_recording.store(false, Ordering::SeqCst);
                                 let _ = dbus_tx_clone.send(AppMsg::StopRecording);
                                 log::info!("D-Bus: Recording stopped");
+                                send_notification("⏹️ Transcribing...");
                             }
                         }
                         DbusMsg::ToggleRecording => {
@@ -181,6 +183,9 @@ fn main() -> Result<()> {
                                 AppMsg::StartRecording
                             });
                             log::info!("D-Bus: Recording toggled to {}", !currently_recording);
+                            if !currently_recording {
+                                send_notification("🎤 Listening...");
+                            }
                         }
                     }
                 }
@@ -303,10 +308,12 @@ fn main() -> Result<()> {
                         recording_clone.store(true, Ordering::SeqCst);
                         let _ = tx_clone.send(AppMsg::StartRecording);
                         log::info!("PTT pressed");
+                        send_notification("🎤 Listening...");
                     } else if is_key_release && recording_clone.load(Ordering::SeqCst) {
                         recording_clone.store(false, Ordering::SeqCst);
                         let _ = tx_clone.send(AppMsg::StopRecording);
                         log::info!("PTT released");
+                        send_notification("⏹️ Transcribing...");
                     }
                 }
             }
@@ -344,4 +351,12 @@ fn parse_ptt_key(key: &str) -> Key {
         "F12" => Key::F12,
         _ => Key::F12,
     }
+}
+
+fn send_notification(body: &str) {
+    use std::process::Command;
+    log::info!("Sending notification: {}", body);
+    let _ = Command::new("notify-send")
+        .args(["-u", "low", "-t", "1000", "-a", "vype", "vype", body])
+        .spawn();
 }

@@ -1,0 +1,13 @@
+[Unit]
+Description=Vype dev (cargo run)
+
+[Service]
+Type=simple
+WorkingDirectory=/home/gnarus/d/vype
+ExecStartPre=cargo build --features vulkan
+ExecStart=/home/gnarus/d/vype/target/debug/vype -s medium
+Restart=on-failure
+Environment=VYPE_GPU=vulkan
+
+[Install]
+WantedBy=default.target
