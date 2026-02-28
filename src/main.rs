@@ -185,6 +185,8 @@ fn main() -> Result<()> {
                             log::info!("D-Bus: Recording toggled to {}", !currently_recording);
                             if !currently_recording {
                                 send_notification("🎤 Listening...");
+                            } else {
+                                send_notification("⏹️ Transcribing...");
                             }
                         }
                     }
