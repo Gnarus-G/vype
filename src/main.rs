@@ -31,28 +31,13 @@ use vype::sources::AudioSource;
 ))]
 use vype::sources::CpalAudioSource;
 
-#[cfg(any(
-    feature = "cpu",
-    feature = "vulkan",
-    feature = "cuda",
-    feature = "dbus"
-))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::sources::{KeyboardSink, Transcriber, WhisperTranscriber, XdoKeyboardSink};
 
-#[cfg(any(
-    feature = "cpu",
-    feature = "vulkan",
-    feature = "cuda",
-    feature = "dbus"
-))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::model::get_model_path;
 
-#[cfg(any(
-    feature = "cpu",
-    feature = "vulkan",
-    feature = "cuda",
-    feature = "dbus"
-))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::pure::resample::resample_to_16khz_mono;
 
 #[cfg(any(
@@ -189,12 +174,7 @@ fn main() -> Result<()> {
     }
 
     std::thread::spawn(move || {
-        #[cfg(any(
-            feature = "cpu",
-            feature = "vulkan",
-            feature = "cuda",
-            feature = "dbus"
-        ))]
+        #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
         {
             let mut sink = XdoKeyboardSink::new().expect("Failed to create xdo keyboard");
 
@@ -269,6 +249,23 @@ fn main() -> Result<()> {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        #[cfg(feature = "dbus")]
+        {
+            while running_for_audio.load(Ordering::SeqCst) {
+                if let Ok(msg) = rx.recv_timeout(Duration::from_millis(50)) {
+                    match msg {
+                        AppMsg::StartRecording => {
+                            log::info!("Recording started (D-Bus mode)...");
+                        }
+                        AppMsg::StopRecording => {
+                            log::info!("Recording stopped (D-Bus mode)...");
+                        }
+                        AppMsg::PartialTranscribe => {}
                     }
                 }
             }
