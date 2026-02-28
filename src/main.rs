@@ -5,7 +5,6 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::Parser;
 use env_logger::Env;
-use rdev::{listen, Event, EventType, Key};
 
 use vype::config::Config;
 
@@ -69,10 +68,7 @@ fn main() -> Result<()> {
 
     let config = Config::parse();
 
-    log::info!(
-        "Vype started. Press and hold {} to record, release to transcribe.",
-        config.key
-    );
+    log::info!("Vype started. Use D-Bus to control recording.");
     log::info!(
         "Partial transcription interval: {}s",
         config.partial_interval_secs
@@ -87,12 +83,9 @@ fn main() -> Result<()> {
     })?;
 
     let recording = Arc::new(AtomicBool::new(false));
-    let ptt_key = parse_ptt_key(&config.key);
     let partial_interval = Duration::from_secs_f64(config.partial_interval_secs);
 
     let (tx, rx) = std::sync::mpsc::channel();
-    let tx_clone = tx.clone();
-    let recording_clone = recording.clone();
     let recording_for_timer = recording.clone();
     let tx_for_timer = tx.clone();
     let running_for_audio = running.clone();
@@ -298,36 +291,10 @@ fn main() -> Result<()> {
         }
     });
 
-    log::info!("Starting keyboard listener...");
-
-    let callback = move |event: Event| {
-        let is_key_press = matches!(event.event_type, EventType::KeyPress(_));
-        let is_key_release = matches!(event.event_type, EventType::KeyRelease(_));
-
-        if is_key_press || is_key_release {
-            if let EventType::KeyPress(key) | EventType::KeyRelease(key) = event.event_type {
-                if key == ptt_key {
-                    if is_key_press && !recording_clone.load(Ordering::SeqCst) {
-                        recording_clone.store(true, Ordering::SeqCst);
-                        let _ = tx_clone.send(AppMsg::StartRecording);
-                        log::info!("PTT pressed");
-                        send_notification("🎤 Listening...");
-                    } else if is_key_release && recording_clone.load(Ordering::SeqCst) {
-                        recording_clone.store(false, Ordering::SeqCst);
-                        let _ = tx_clone.send(AppMsg::StopRecording);
-                        log::info!("PTT released");
-                        send_notification("⏹️ Transcribing...");
-                    }
-                }
-            }
-        }
-    };
-
-    if let Err(error) = listen(callback) {
-        log::error!("Listen error: {:?}", error);
+    // Keep the main thread alive to handle D-Bus messages
+    while running.load(Ordering::SeqCst) {
+        std::thread::sleep(Duration::from_secs(1));
     }
-
-    log::info!("Keyboard listener exited");
 
     Ok(())
 }
@@ -336,24 +303,6 @@ enum AppMsg {
     StartRecording,
     StopRecording,
     PartialTranscribe,
-}
-
-fn parse_ptt_key(key: &str) -> Key {
-    match key.to_uppercase().as_str() {
-        "F1" => Key::F1,
-        "F2" => Key::F2,
-        "F3" => Key::F3,
-        "F4" => Key::F4,
-        "F5" => Key::F5,
-        "F6" => Key::F6,
-        "F7" => Key::F7,
-        "F8" => Key::F8,
-        "F9" => Key::F9,
-        "F10" => Key::F10,
-        "F11" => Key::F11,
-        "F12" => Key::F12,
-        _ => Key::F12,
-    }
 }
 
 fn send_notification(body: &str) {

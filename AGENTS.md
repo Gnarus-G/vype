@@ -11,6 +11,7 @@ A systemd user service for development, located at `vype-dev.service` in the pro
 - Uses medium model by default (`-s medium`)
 - Uses vulkan GPU backend
 - Auto-restarts on failure
+- D-Bus controlled (no keyboard PTT)
 
 ### Installation
 
@@ -45,12 +46,20 @@ Edit `vype-dev.service` to change:
 - GPU backend: change `vulkan` to `cuda` or remove features for CPU
 - CLI options: see `vype --help`
 
-### Testing D-Bus
+### Controlling Recording via D-Bus
 
 ```bash
 # Toggle recording
 dbus-send --session --dest=tech.bytin.vype --type=method_call \
   /tech/bytin/vype tech.bytin.vype.Recorder.ToggleRecording
+
+# Start recording
+dbus-send --session --dest=tech.bytin.vype --type=method_call \
+  /tech/bytin/vype tech.bytin.vype.Recorder.StartRecording
+
+# Stop recording
+dbus-send --session --dest=tech.bytin.vype --type=method_call \
+  /tech/bytin/vype tech.bytin.vype.Recorder.StopRecording
 
 # Or use busctl
 busctl --user call tech.bytin.vype /tech/bytin/vype tech.bytin.vype.Recorder ToggleRecording
