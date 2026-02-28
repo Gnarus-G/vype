@@ -1,4 +1,4 @@
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Duration;
 
@@ -24,11 +24,13 @@ impl Dbusservice {
 
     pub fn run(&self) -> anyhow::Result<()> {
         let tx = self.msg_tx.clone();
+        let (result_tx, result_rx) = channel::<anyhow::Result<()>>();
 
         thread::spawn(move || {
-            run_dbus_service(tx);
+            run_dbus_service(tx, result_tx);
         });
 
+        result_rx.recv()??;
         Ok(())
     }
 }
@@ -40,22 +42,19 @@ struct Recorder {
 #[zbus::interface(name = "tech.bytin.vype.Recorder")]
 impl Recorder {
     fn start_recording(&self) -> bool {
-        let _ = self.msg_tx.send(DbusMsg::StartRecording);
-        true
+        self.msg_tx.send(DbusMsg::StartRecording).is_ok()
     }
 
     fn stop_recording(&self) -> bool {
-        let _ = self.msg_tx.send(DbusMsg::StopRecording);
-        true
+        self.msg_tx.send(DbusMsg::StopRecording).is_ok()
     }
 
     fn toggle_recording(&self) -> bool {
-        let _ = self.msg_tx.send(DbusMsg::ToggleRecording);
-        true
+        self.msg_tx.send(DbusMsg::ToggleRecording).is_ok()
     }
 }
 
-fn run_dbus_service(tx: Sender<DbusMsg>) {
+fn run_dbus_service(tx: Sender<DbusMsg>, result_tx: Sender<anyhow::Result<()>>) {
     let recorder = Recorder { msg_tx: tx };
 
     let result = zbus::blocking::connection::Builder::session()
@@ -66,13 +65,16 @@ fn run_dbus_service(tx: Sender<DbusMsg>) {
     match result {
         Ok(_) => {}
         Err(e) => {
-            log::error!("Failed to create D-Bus connection: {}", e);
+            let err = anyhow::anyhow!("Failed to create D-Bus connection: {}", e);
+            let _ = result_tx.send(Err(err));
             return;
         }
     };
 
+    let _ = result_tx.send(Ok(()));
+
     log::info!(
-        "D-Bus service running. Access via: busctl call {} {} {} ToggleRecording",
+        "D-Bus service running. Access via: busctl --user call {} {} {} ToggleRecording",
         SERVICE_NAME,
         OBJECT_PATH,
         INTERFACE_NAME

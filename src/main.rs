@@ -8,27 +8,12 @@ use env_logger::Env;
 
 use vype::config::Config;
 
-#[cfg(any(
-    feature = "cpu",
-    feature = "vulkan",
-    feature = "cuda",
-    feature = "dbus"
-))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::pure::typing_state::TypingState;
 
-#[cfg(any(
-    feature = "cpu",
-    feature = "vulkan",
-    feature = "cuda",
-    feature = "dbus"
-))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::sources::AudioSource;
-#[cfg(any(
-    feature = "cpu",
-    feature = "vulkan",
-    feature = "cuda",
-    feature = "dbus"
-))]
+#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::sources::CpalAudioSource;
 
 #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
@@ -129,7 +114,7 @@ fn main() -> Result<()> {
         if let Err(e) = dbus_service.run() {
             log::error!("Failed to start D-Bus service: {}", e);
         } else {
-            log::info!("D-Bus service started. Access via: busctl call tech.bytin.vype /tech/bytin/vype tech.bytin.vype ToggleRecording");
+            log::info!("D-Bus service started. Access via: busctl --user call tech.bytin.vype /tech/bytin/vype tech.bytin.vype.Recorder ToggleRecording");
         }
 
         std::thread::spawn(move || {
