@@ -53,7 +53,7 @@ dbus-send --session --dest=tech.bytin.vype --type=method_call \
   /tech/bytin/vype tech.bytin.vype.Recorder.ToggleRecording
 
 # Or use busctl
-busctl call tech.bytin.vype /tech/bytin/vype tech.bytin.vype.Recorder ToggleRecording
+busctl --user call tech.bytin.vype /tech/bytin/vype tech.bytin.vype.Recorder ToggleRecording
 ```
 
 ## Production Service
