@@ -43,6 +43,6 @@ fn model_filename_for_size(size: &str) -> String {
         "small" => "ggml-small.en.bin".to_string(),
         "medium" => "ggml-medium.en.bin".to_string(),
         "large" => "ggml-large-v3.bin".to_string(),
-        _ => "ggml-small.en.bin".to_string(),
+        _ => format!("ggml-{}.en.bin", DEFAULT_MODEL_SIZE),
     }
 }

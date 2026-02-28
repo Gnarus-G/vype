@@ -1,4 +1,6 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Sender};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -15,19 +17,24 @@ pub enum DbusMsg {
 
 pub struct Dbusservice {
     msg_tx: Sender<DbusMsg>,
+    is_recording: Arc<AtomicBool>,
 }
 
 impl Dbusservice {
-    pub fn new(msg_tx: Sender<DbusMsg>) -> Self {
-        Self { msg_tx }
+    pub fn new(msg_tx: Sender<DbusMsg>, is_recording: Arc<AtomicBool>) -> Self {
+        Self {
+            msg_tx,
+            is_recording,
+        }
     }
 
     pub fn run(&self) -> anyhow::Result<()> {
         let tx = self.msg_tx.clone();
+        let recording = self.is_recording.clone();
         let (result_tx, result_rx) = channel::<anyhow::Result<()>>();
 
         thread::spawn(move || {
-            run_dbus_service(tx, result_tx);
+            run_dbus_service(tx, recording, result_tx);
         });
 
         result_rx.recv()??;
@@ -37,33 +44,50 @@ impl Dbusservice {
 
 struct Recorder {
     msg_tx: Sender<DbusMsg>,
+    is_recording: Arc<AtomicBool>,
 }
 
 #[zbus::interface(name = "tech.bytin.vype.Recorder")]
 impl Recorder {
     fn start_recording(&self) -> bool {
+        self.is_recording.store(true, Ordering::SeqCst);
         self.msg_tx.send(DbusMsg::StartRecording).is_ok()
     }
 
     fn stop_recording(&self) -> bool {
+        self.is_recording.store(false, Ordering::SeqCst);
         self.msg_tx.send(DbusMsg::StopRecording).is_ok()
     }
 
     fn toggle_recording(&self) -> bool {
+        let new_state = !self.is_recording.load(Ordering::SeqCst);
+        self.is_recording.store(new_state, Ordering::SeqCst);
         self.msg_tx.send(DbusMsg::ToggleRecording).is_ok()
+    }
+
+    #[zbus(property)]
+    fn is_recording(&self) -> bool {
+        self.is_recording.load(Ordering::SeqCst)
     }
 }
 
-fn run_dbus_service(tx: Sender<DbusMsg>, result_tx: Sender<anyhow::Result<()>>) {
-    let recorder = Recorder { msg_tx: tx };
+fn run_dbus_service(
+    tx: Sender<DbusMsg>,
+    recording: Arc<AtomicBool>,
+    result_tx: Sender<anyhow::Result<()>>,
+) {
+    let recorder = Recorder {
+        msg_tx: tx,
+        is_recording: recording,
+    };
 
     let result = zbus::blocking::connection::Builder::session()
         .and_then(|b| b.name(SERVICE_NAME))
         .and_then(|b| b.serve_at(OBJECT_PATH, recorder))
         .and_then(|b| b.build());
 
-    match result {
-        Ok(_) => {}
+    let _conn = match result {
+        Ok(conn) => conn,
         Err(e) => {
             let err = anyhow::anyhow!("Failed to create D-Bus connection: {}", e);
             let _ = result_tx.send(Err(err));

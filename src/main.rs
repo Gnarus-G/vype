@@ -110,7 +110,7 @@ fn main() -> Result<()> {
         feature = "dbus"
     ))]
     {
-        let dbus_service = Dbusservice::new(dbus_tx);
+        let dbus_service = Dbusservice::new(dbus_tx, dbus_recording.clone());
         if let Err(e) = dbus_service.run() {
             log::error!("Failed to start D-Bus service: {}", e);
         } else {
@@ -201,11 +201,11 @@ fn main() -> Result<()> {
                                 );
                                 match transcriber.transcribe(&resampled) {
                                     Ok(text) => {
-                                        log::info!("Transcribed: {}", text);
+                                        log::info!("Transcribed {} chars", text.len());
                                         if !text.is_empty() {
                                             let ops = typing_state.transition(&text);
                                             sink.execute_ops(&ops);
-                                            send_notification(&format!("Typed: {}", text));
+                                            send_notification("Typed text");
                                         }
                                     }
                                     Err(e) => log::error!("Transcription error: {}", e),
