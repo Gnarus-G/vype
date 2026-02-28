@@ -247,6 +247,7 @@ fn main() -> Result<()> {
                                         if !text.is_empty() {
                                             let ops = typing_state.transition(&text);
                                             sink.execute_ops(&ops);
+                                            send_notification(&format!("Typed: {}", text));
                                         }
                                     }
                                     Err(e) => log::error!("Transcription error: {}", e),
@@ -359,6 +360,15 @@ fn send_notification(body: &str) {
     use std::process::Command;
     log::info!("Sending notification: {}", body);
     let _ = Command::new("notify-send")
-        .args(["-u", "low", "-t", "1000", "-a", "vype", "vype", body])
+        .args([
+            "-u",
+            "low",
+            "-t",
+            "1000",
+            "-a",
+            "tech.bytin.vype",
+            "vype",
+            body,
+        ])
         .spawn();
 }

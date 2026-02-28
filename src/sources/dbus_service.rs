@@ -1,5 +1,3 @@
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -8,17 +6,6 @@ use std::time::Duration;
 const SERVICE_NAME: &str = "tech.bytin.vype";
 const OBJECT_PATH: &str = "/tech/bytin/vype";
 const INTERFACE_NAME: &str = "tech.bytin.vype.Recorder";
-
-fn dbg(s: &str) {
-    if let Ok(mut f) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/tmp/vype-dbus.log")
-    {
-        let _ = writeln!(f, "{}", s);
-    }
-    eprintln!("{}", s);
-}
 
 #[derive(Clone, Copy, Debug)]
 pub enum DbusMsg {
@@ -85,35 +72,19 @@ impl Recorder {
 }
 
 fn run_dbus_service(tx: std::sync::mpsc::Sender<DbusMsg>, recording: Arc<AtomicBool>) {
-    dbg("Starting D-Bus service...");
-
     let recorder = Recorder {
         recording: recording.clone(),
         msg_tx: tx,
     };
 
-    dbg("Creating session builder...");
-
     let result = zbus::blocking::connection::Builder::session()
-        .and_then(|b| {
-            dbg("Got session builder, requesting name...");
-            b.name(SERVICE_NAME)
-        })
-        .and_then(|b| {
-            dbg("Got name, serving at object path...");
-            b.serve_at(OBJECT_PATH, recorder)
-        })
-        .and_then(|b| {
-            dbg("Built connection");
-            b.build()
-        });
+        .and_then(|b| b.name(SERVICE_NAME))
+        .and_then(|b| b.serve_at(OBJECT_PATH, recorder))
+        .and_then(|b| b.build());
 
-    dbg(&format!("Result: {:?}", result));
-
-    let connection = match result {
-        Ok(c) => c,
+    match result {
+        Ok(_) => {}
         Err(e) => {
-            eprintln!("D-Bus connection error: {}", e);
             log::error!("Failed to create D-Bus connection: {}", e);
             return;
         }
