@@ -26,6 +26,17 @@ use vype::model::get_model_path;
 #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::pure::resample::resample_to_16khz_mono;
 
+fn notify(title: &str, body: &str) {
+    if let Err(e) = notify_rust::Notification::new()
+        .summary(title)
+        .body(body)
+        .timeout(2000)
+        .show()
+    {
+        log::error!("Failed to show notification: {}", e);
+    }
+}
+
 fn main() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
@@ -91,11 +102,13 @@ fn main() -> Result<()> {
                                 log::error!("Error starting audio: {}", e);
                             } else {
                                 log::info!("Recording started...");
+                                notify("Vype", "Recording started");
                             }
                         }
                         AppMsg::StopRecording => {
                             let samples = audio_source.stop();
                             log::info!("Recording stopped. Samples: {}", samples.len());
+                            notify("Vype", "Recording stopped");
                             if !samples.is_empty() {
                                 let resampled = resample_to_16khz_mono(
                                     &samples,
