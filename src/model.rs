@@ -2,7 +2,7 @@ use anyhow::Result;
 use hf_hub::api::sync::Api;
 use std::path::PathBuf;
 
-const DEFAULT_MODEL_SIZE: &str = "small";
+const DEFAULT_MODEL_SIZE: &str = "medium";
 
 pub fn get_model_path(custom_path: Option<&str>, model_size: Option<&str>) -> Result<PathBuf> {
     if let Some(path) = custom_path {
@@ -43,6 +43,6 @@ fn model_filename_for_size(size: &str) -> String {
         "small" => "ggml-small.en.bin".to_string(),
         "medium" => "ggml-medium.en.bin".to_string(),
         "large" => "ggml-large-v3.bin".to_string(),
-        _ => "ggml-small.en.bin".to_string(),
+        _ => format!("ggml-{}.en.bin", DEFAULT_MODEL_SIZE),
     }
 }

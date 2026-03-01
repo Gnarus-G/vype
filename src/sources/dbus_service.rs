@@ -1,6 +1,5 @@
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -8,17 +7,6 @@ use std::time::Duration;
 const SERVICE_NAME: &str = "tech.bytin.vype";
 const OBJECT_PATH: &str = "/tech/bytin/vype";
 const INTERFACE_NAME: &str = "tech.bytin.vype.Recorder";
-
-fn dbg(s: &str) {
-    if let Ok(mut f) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/tmp/vype-dbus.log")
-    {
-        let _ = writeln!(f, "{}", s);
-    }
-    eprintln!("{}", s);
-}
 
 #[derive(Clone, Copy, Debug)]
 pub enum DbusMsg {
@@ -28,105 +16,115 @@ pub enum DbusMsg {
 }
 
 pub struct Dbusservice {
-    msg_tx: std::sync::mpsc::Sender<DbusMsg>,
-    recording: Arc<AtomicBool>,
+    msg_tx: Sender<DbusMsg>,
+    is_recording: Arc<AtomicBool>,
+    shutdown: Arc<AtomicBool>,
 }
 
 impl Dbusservice {
-    pub fn new(msg_tx: std::sync::mpsc::Sender<DbusMsg>) -> Self {
+    pub fn new(msg_tx: Sender<DbusMsg>, is_recording: Arc<AtomicBool>) -> Self {
         Self {
             msg_tx,
-            recording: Arc::new(AtomicBool::new(false)),
+            is_recording,
+            shutdown: Arc::new(AtomicBool::new(false)),
         }
-    }
-
-    pub fn recording_flag(&self) -> Arc<AtomicBool> {
-        self.recording.clone()
     }
 
     pub fn run(&self) -> anyhow::Result<()> {
         let tx = self.msg_tx.clone();
-        let recording = self.recording.clone();
+        let recording = self.is_recording.clone();
+        let shutdown = self.shutdown.clone();
+        let (result_tx, result_rx) = channel::<anyhow::Result<()>>();
 
         thread::spawn(move || {
-            run_dbus_service(tx, recording);
+            run_dbus_service(tx, recording, result_tx, shutdown);
         });
 
+        result_rx
+            .recv_timeout(Duration::from_secs(10))
+            .map_err(|e| anyhow::anyhow!("D-Bus service startup timed out: {}", e))??;
         Ok(())
+    }
+
+    pub fn shutdown(&self) {
+        self.shutdown.store(true, Ordering::SeqCst);
     }
 }
 
 struct Recorder {
-    recording: Arc<AtomicBool>,
-    msg_tx: std::sync::mpsc::Sender<DbusMsg>,
+    msg_tx: Sender<DbusMsg>,
+    is_recording: Arc<AtomicBool>,
 }
 
 #[zbus::interface(name = "tech.bytin.vype.Recorder")]
 impl Recorder {
     fn start_recording(&self) -> bool {
-        let _ = self.msg_tx.send(DbusMsg::StartRecording);
-        true
+        if self.msg_tx.send(DbusMsg::StartRecording).is_ok() {
+            true
+        } else {
+            false
+        }
     }
 
     fn stop_recording(&self) -> bool {
-        let _ = self.msg_tx.send(DbusMsg::StopRecording);
-        true
+        if self.msg_tx.send(DbusMsg::StopRecording).is_ok() {
+            true
+        } else {
+            false
+        }
     }
 
     fn toggle_recording(&self) -> bool {
-        let _ = self.msg_tx.send(DbusMsg::ToggleRecording);
-        true
+        if self.msg_tx.send(DbusMsg::ToggleRecording).is_ok() {
+            true
+        } else {
+            false
+        }
     }
 
     #[zbus(property)]
     fn is_recording(&self) -> bool {
-        self.recording.load(Ordering::SeqCst)
+        self.is_recording.load(Ordering::SeqCst)
     }
 }
 
-fn run_dbus_service(tx: std::sync::mpsc::Sender<DbusMsg>, recording: Arc<AtomicBool>) {
-    dbg("Starting D-Bus service...");
-
+fn run_dbus_service(
+    tx: Sender<DbusMsg>,
+    recording: Arc<AtomicBool>,
+    result_tx: Sender<anyhow::Result<()>>,
+    shutdown_rx: Arc<AtomicBool>,
+) {
     let recorder = Recorder {
-        recording: recording.clone(),
         msg_tx: tx,
+        is_recording: recording,
     };
 
-    dbg("Creating session builder...");
-
     let result = zbus::blocking::connection::Builder::session()
-        .and_then(|b| {
-            dbg("Got session builder, requesting name...");
-            b.name(SERVICE_NAME)
-        })
-        .and_then(|b| {
-            dbg("Got name, serving at object path...");
-            b.serve_at(OBJECT_PATH, recorder)
-        })
-        .and_then(|b| {
-            dbg("Built connection");
-            b.build()
-        });
+        .and_then(|b| b.name(SERVICE_NAME))
+        .and_then(|b| b.serve_at(OBJECT_PATH, recorder))
+        .and_then(|b| b.build());
 
-    dbg(&format!("Result: {:?}", result));
-
-    let connection = match result {
-        Ok(c) => c,
+    let _conn = match result {
+        Ok(conn) => conn,
         Err(e) => {
-            eprintln!("D-Bus connection error: {}", e);
-            log::error!("Failed to create D-Bus connection: {}", e);
+            let err = anyhow::anyhow!("Failed to create D-Bus connection: {}", e);
+            let _ = result_tx.send(Err(err));
             return;
         }
     };
 
+    let _ = result_tx.send(Ok(()));
+
     log::info!(
-        "D-Bus service running. Access via: busctl call {} {} {} ToggleRecording",
+        "D-Bus service running. Access via: busctl --user call {} {} {} ToggleRecording",
         SERVICE_NAME,
         OBJECT_PATH,
         INTERFACE_NAME
     );
 
-    loop {
-        thread::sleep(Duration::from_millis(500));
+    while !shutdown_rx.load(Ordering::SeqCst) {
+        thread::sleep(Duration::from_millis(100));
     }
+
+    log::info!("D-Bus service shutting down");
 }

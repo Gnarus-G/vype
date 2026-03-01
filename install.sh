@@ -77,8 +77,31 @@ mkdir -p "$INSTALL_DIR"
 tar -xzf "$TEMP_DIR/$TARBALL" -C "$INSTALL_DIR"
 chmod +x "$INSTALL_DIR/vype"
 
+SYSTEMD_DIR="$HOME/.config/systemd/user"
+mkdir -p "$SYSTEMD_DIR"
+
+INSTALL_DIR_ABS=$(realpath "$INSTALL_DIR")
+
+cat > "$SYSTEMD_DIR/vype.service" << EOF
+[Unit]
+Description=Vype speech-to-text keyboard
+
+[Service]
+ExecStart=$INSTALL_DIR_ABS/vype
+Restart=on-failure
+Environment=VYPE_GPU=$GPU_BACKEND
+
+[Install]
+WantedBy=default.target
+EOF
+
 echo ""
 echo "Installed vype to $INSTALL_DIR/vype"
+echo "Systemd service installed to $SYSTEMD_DIR/vype.service"
+echo ""
+echo "To enable and start the service:"
+echo "  systemctl --user enable vype"
+echo "  systemctl --user start vype"
 echo ""
 echo "Make sure $INSTALL_DIR is in your PATH."
 echo "Add to PATH: export PATH=\"\$PATH:$INSTALL_DIR\""

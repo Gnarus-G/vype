@@ -9,9 +9,6 @@ pub struct Config {
     #[arg(short = 's', long, value_name = "SIZE", value_parser = ["tiny", "base", "small", "medium", "large"])]
     pub model_size: Option<String>,
 
-    #[arg(short = 'k', long, default_value = "F12", value_name = "KEY")]
-    pub key: String,
-
     #[arg(short = 'l', long, default_value = "en", value_name = "LANG")]
     pub language: String,
 
@@ -47,7 +44,6 @@ impl Default for Config {
         Self {
             model: None,
             model_size: None,
-            key: "F12".to_string(),
             language: "en".to_string(),
             max_duration_secs: 30,
             partial_interval_secs: 2.0,
