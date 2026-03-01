@@ -27,6 +27,37 @@ use vype::pure::resample::resample_to_16khz_mono;
 
 use vype::sources::dbus_service::{DbusMsg, Dbusservice};
 
+struct AppState {
+    is_recording: Arc<AtomicBool>,
+}
+
+impl AppState {
+    fn new() -> Self {
+        Self {
+            is_recording: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    fn is_recording(&self) -> bool {
+        self.is_recording.load(Ordering::SeqCst)
+    }
+
+    fn start_recording(&self) {
+        self.is_recording.store(true, Ordering::SeqCst);
+    }
+
+    fn stop_recording(&self) {
+        self.is_recording.store(false, Ordering::SeqCst);
+    }
+
+    fn toggle_recording(&self) -> bool {
+        let current = self.is_recording.load(Ordering::SeqCst);
+        let new = !current;
+        self.is_recording.store(new, Ordering::SeqCst);
+        new
+    }
+}
+
 fn main() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
@@ -46,11 +77,11 @@ fn main() -> Result<()> {
         std::process::exit(0);
     })?;
 
-    let recording = Arc::new(AtomicBool::new(false));
+    let state = Arc::new(AppState::new());
     let partial_interval = Duration::from_secs_f64(config.partial_interval_secs);
 
     let (tx, rx) = std::sync::mpsc::channel();
-    let recording_for_timer = recording.clone();
+    let state_for_timer = state.clone();
     let tx_for_timer = tx.clone();
     let running_for_audio = running.clone();
     let running_for_timer = running.clone();
@@ -64,10 +95,10 @@ fn main() -> Result<()> {
 
     let (dbus_tx, dbus_rx) = std::sync::mpsc::channel();
     let dbus_running = running.clone();
-    let dbus_recording = recording.clone();
+    let state_for_dbus = state.clone();
     let dbus_tx_clone = tx.clone();
 
-    let dbus_service = Dbusservice::new(dbus_tx, dbus_recording.clone());
+    let dbus_service = Dbusservice::new(dbus_tx, state_for_dbus.is_recording.clone());
     if let Err(e) = dbus_service.run() {
         log::error!("Failed to start D-Bus service: {}", e);
     } else {
@@ -79,25 +110,23 @@ fn main() -> Result<()> {
             if let Ok(msg) = dbus_rx.recv_timeout(Duration::from_millis(50)) {
                 match msg {
                     DbusMsg::StartRecording => {
-                        if !dbus_recording.load(Ordering::SeqCst) {
-                            dbus_recording.store(true, Ordering::SeqCst);
+                        if !state_for_dbus.is_recording() {
+                            state_for_dbus.start_recording();
                             let _ = dbus_tx_clone.send(AppMsg::StartRecording);
                             log::info!("D-Bus: Recording started");
                             send_notification("🎤 Listening...");
                         }
                     }
                     DbusMsg::StopRecording => {
-                        if dbus_recording.load(Ordering::SeqCst) {
-                            dbus_recording.store(false, Ordering::SeqCst);
+                        if state_for_dbus.is_recording() {
+                            state_for_dbus.stop_recording();
                             let _ = dbus_tx_clone.send(AppMsg::StopRecording);
                             log::info!("D-Bus: Recording stopped");
                             send_notification("⏹️ Transcribing...");
                         }
                     }
                     DbusMsg::ToggleRecording => {
-                        let currently_recording = dbus_recording.load(Ordering::SeqCst);
-                        let new_state = !currently_recording;
-                        dbus_recording.store(new_state, Ordering::SeqCst);
+                        let new_state = state_for_dbus.toggle_recording();
                         log::info!("D-Bus: Recording toggled to {}", new_state);
                         if new_state {
                             let _ = dbus_tx_clone.send(AppMsg::StartRecording);
@@ -214,7 +243,7 @@ fn main() -> Result<()> {
     std::thread::spawn(move || {
         while running_for_timer.load(Ordering::SeqCst) {
             std::thread::sleep(partial_interval);
-            if recording_for_timer.load(Ordering::SeqCst) {
+            if state_for_timer.is_recording() {
                 let _ = tx_for_timer.send(AppMsg::PartialTranscribe);
             }
         }
