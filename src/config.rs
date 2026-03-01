@@ -6,8 +6,8 @@ pub struct Config {
     #[arg(short = 'm', long, value_name = "PATH")]
     pub model: Option<String>,
 
-    #[arg(short = 's', long, value_name = "SIZE", value_parser = ["tiny", "base", "small", "medium", "large"])]
-    pub model_size: Option<String>,
+    #[arg(short = 's', long, default_value = "medium", value_name = "SIZE", value_parser = ["tiny", "base", "small", "medium", "large"])]
+    pub model_size: String,
 
     #[arg(short = 'k', long, default_value = "F9", value_name = "KEY")]
     pub key: String,
@@ -46,7 +46,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             model: None,
-            model_size: None,
+            model_size: "medium".to_string(),
             key: "F9".to_string(),
             language: "en".to_string(),
             max_duration_secs: 30,
