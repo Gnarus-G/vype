@@ -72,7 +72,7 @@ fn main() -> Result<()> {
         {
             let mut sink = XdoKeyboardSink::new().expect("Failed to create xdo keyboard");
 
-            let model_path = get_model_path(model_opt.as_deref(), model_size_opt.as_deref())
+            let model_path = get_model_path(model_opt.as_deref(), Some(&model_size_opt))
                 .expect("Failed to get model");
 
             let mut audio_source = CpalAudioSource::new().expect("Failed to create audio source");

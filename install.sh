@@ -87,7 +87,7 @@ cat >"$SYSTEMD_DIR/vype.service" <<EOF
 Description=Vype speech-to-text keyboard
 
 [Service]
-ExecStart=$INSTALL_DIR_ABS/vype
+ExecStart=$INSTALL_DIR_ABS/vype -s medium
 Restart=on-failure
 
 [Install]

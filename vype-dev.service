@@ -1,0 +1,12 @@
+[Unit]
+Description=Vype speech-to-text keyboard (dev)
+
+[Service]
+Type=simple
+ExecStartPre=cargo build -r --features vulkan
+ExecStart=%h/d/vype/target/release/vype -s large
+WorkingDirectory=%h/d/vype
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
