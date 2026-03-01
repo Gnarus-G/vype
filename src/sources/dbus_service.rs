@@ -18,6 +18,7 @@ pub enum DbusMsg {
 pub struct Dbusservice {
     msg_tx: Sender<DbusMsg>,
     is_recording: Arc<AtomicBool>,
+    shutdown: Arc<AtomicBool>,
 }
 
 impl Dbusservice {
@@ -25,22 +26,28 @@ impl Dbusservice {
         Self {
             msg_tx,
             is_recording,
+            shutdown: Arc::new(AtomicBool::new(false)),
         }
     }
 
     pub fn run(&self) -> anyhow::Result<()> {
         let tx = self.msg_tx.clone();
         let recording = self.is_recording.clone();
+        let shutdown = self.shutdown.clone();
         let (result_tx, result_rx) = channel::<anyhow::Result<()>>();
 
         thread::spawn(move || {
-            run_dbus_service(tx, recording, result_tx);
+            run_dbus_service(tx, recording, result_tx, shutdown);
         });
 
         result_rx
             .recv_timeout(Duration::from_secs(10))
             .map_err(|e| anyhow::anyhow!("D-Bus service startup timed out: {}", e))??;
         Ok(())
+    }
+
+    pub fn shutdown(&self) {
+        self.shutdown.store(true, Ordering::SeqCst);
     }
 }
 
@@ -53,7 +60,6 @@ struct Recorder {
 impl Recorder {
     fn start_recording(&self) -> bool {
         if self.msg_tx.send(DbusMsg::StartRecording).is_ok() {
-            self.is_recording.store(true, Ordering::SeqCst);
             true
         } else {
             false
@@ -62,7 +68,6 @@ impl Recorder {
 
     fn stop_recording(&self) -> bool {
         if self.msg_tx.send(DbusMsg::StopRecording).is_ok() {
-            self.is_recording.store(false, Ordering::SeqCst);
             true
         } else {
             false
@@ -70,9 +75,7 @@ impl Recorder {
     }
 
     fn toggle_recording(&self) -> bool {
-        let new_state = !self.is_recording.load(Ordering::SeqCst);
         if self.msg_tx.send(DbusMsg::ToggleRecording).is_ok() {
-            self.is_recording.store(new_state, Ordering::SeqCst);
             true
         } else {
             false
@@ -89,6 +92,7 @@ fn run_dbus_service(
     tx: Sender<DbusMsg>,
     recording: Arc<AtomicBool>,
     result_tx: Sender<anyhow::Result<()>>,
+    shutdown_rx: Arc<AtomicBool>,
 ) {
     let recorder = Recorder {
         msg_tx: tx,
@@ -118,7 +122,9 @@ fn run_dbus_service(
         INTERFACE_NAME
     );
 
-    loop {
-        thread::sleep(Duration::from_millis(500));
+    while !shutdown_rx.load(Ordering::SeqCst) {
+        thread::sleep(Duration::from_millis(100));
     }
+
+    log::info!("D-Bus service shutting down");
 }

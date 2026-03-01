@@ -25,12 +25,6 @@ use vype::model::get_model_path;
 #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype::pure::resample::resample_to_16khz_mono;
 
-#[cfg(any(
-    feature = "cpu",
-    feature = "vulkan",
-    feature = "cuda",
-    feature = "dbus"
-))]
 use vype::sources::dbus_service::{DbusMsg, Dbusservice};
 
 fn main() -> Result<()> {
@@ -61,102 +55,62 @@ fn main() -> Result<()> {
     let running_for_audio = running.clone();
     let running_for_timer = running.clone();
 
-    #[cfg(any(
-        feature = "cpu",
-        feature = "vulkan",
-        feature = "cuda",
-        feature = "dbus"
-    ))]
+    #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
     let (model_opt, model_size_opt, language_opt) = (
         config.model.clone(),
         config.model_size.clone(),
         config.language.clone(),
     );
 
-    #[cfg(any(
-        feature = "cpu",
-        feature = "vulkan",
-        feature = "cuda",
-        feature = "dbus"
-    ))]
     let (dbus_tx, dbus_rx) = std::sync::mpsc::channel();
-
-    #[cfg(any(
-        feature = "cpu",
-        feature = "vulkan",
-        feature = "cuda",
-        feature = "dbus"
-    ))]
     let dbus_running = running.clone();
-    #[cfg(any(
-        feature = "cpu",
-        feature = "vulkan",
-        feature = "cuda",
-        feature = "dbus"
-    ))]
     let dbus_recording = recording.clone();
-    #[cfg(any(
-        feature = "cpu",
-        feature = "vulkan",
-        feature = "cuda",
-        feature = "dbus"
-    ))]
     let dbus_tx_clone = tx.clone();
 
-    #[cfg(any(
-        feature = "cpu",
-        feature = "vulkan",
-        feature = "cuda",
-        feature = "dbus"
-    ))]
-    {
-        let dbus_service = Dbusservice::new(dbus_tx, dbus_recording.clone());
-        if let Err(e) = dbus_service.run() {
-            log::error!("Failed to start D-Bus service: {}", e);
-        } else {
-            log::info!("D-Bus service started. Access via: busctl --user call tech.bytin.vype /tech/bytin/vype tech.bytin.vype.Recorder ToggleRecording");
-        }
+    let dbus_service = Dbusservice::new(dbus_tx, dbus_recording.clone());
+    if let Err(e) = dbus_service.run() {
+        log::error!("Failed to start D-Bus service: {}", e);
+    } else {
+        log::info!("D-Bus service started. Access via: busctl --user call tech.bytin.vype /tech/bytin/vype tech.bytin.vype.Recorder ToggleRecording");
+    }
 
-        std::thread::spawn(move || {
-            while dbus_running.load(Ordering::SeqCst) {
-                if let Ok(msg) = dbus_rx.recv_timeout(Duration::from_millis(50)) {
-                    match msg {
-                        DbusMsg::StartRecording => {
-                            if !dbus_recording.load(Ordering::SeqCst) {
-                                dbus_recording.store(true, Ordering::SeqCst);
-                                let _ = dbus_tx_clone.send(AppMsg::StartRecording);
-                                log::info!("D-Bus: Recording started");
-                                send_notification("🎤 Listening...");
-                            }
+    std::thread::spawn(move || {
+        while dbus_running.load(Ordering::SeqCst) {
+            if let Ok(msg) = dbus_rx.recv_timeout(Duration::from_millis(50)) {
+                match msg {
+                    DbusMsg::StartRecording => {
+                        if !dbus_recording.load(Ordering::SeqCst) {
+                            dbus_recording.store(true, Ordering::SeqCst);
+                            let _ = dbus_tx_clone.send(AppMsg::StartRecording);
+                            log::info!("D-Bus: Recording started");
+                            send_notification("🎤 Listening...");
                         }
-                        DbusMsg::StopRecording => {
-                            if dbus_recording.load(Ordering::SeqCst) {
-                                dbus_recording.store(false, Ordering::SeqCst);
-                                let _ = dbus_tx_clone.send(AppMsg::StopRecording);
-                                log::info!("D-Bus: Recording stopped");
-                                send_notification("⏹️ Transcribing...");
-                            }
+                    }
+                    DbusMsg::StopRecording => {
+                        if dbus_recording.load(Ordering::SeqCst) {
+                            dbus_recording.store(false, Ordering::SeqCst);
+                            let _ = dbus_tx_clone.send(AppMsg::StopRecording);
+                            log::info!("D-Bus: Recording stopped");
+                            send_notification("⏹️ Transcribing...");
                         }
-                        DbusMsg::ToggleRecording => {
-                            let currently_recording = dbus_recording.load(Ordering::SeqCst);
-                            dbus_recording.store(!currently_recording, Ordering::SeqCst);
-                            let _ = dbus_tx_clone.send(if currently_recording {
-                                AppMsg::StopRecording
-                            } else {
-                                AppMsg::StartRecording
-                            });
-                            log::info!("D-Bus: Recording toggled to {}", !currently_recording);
-                            if !currently_recording {
-                                send_notification("🎤 Listening...");
-                            } else {
-                                send_notification("⏹️ Transcribing...");
-                            }
+                    }
+                    DbusMsg::ToggleRecording => {
+                        let currently_recording = dbus_recording.load(Ordering::SeqCst);
+                        let new_state = !currently_recording;
+                        dbus_recording.store(new_state, Ordering::SeqCst);
+                        log::info!("D-Bus: Recording toggled to {}", new_state);
+                        if new_state {
+                            let _ = dbus_tx_clone.send(AppMsg::StartRecording);
+                            send_notification("🎤 Listening...");
+                        } else {
+                            let _ = dbus_tx_clone.send(AppMsg::StopRecording);
+                            send_notification("⏹️ Transcribing...");
                         }
                     }
                 }
             }
-        });
-    }
+        }
+    });
 
     std::thread::spawn(move || {
         #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
@@ -239,32 +193,20 @@ fn main() -> Result<()> {
             }
         }
 
-        #[cfg(feature = "dbus")]
+        #[cfg(not(any(feature = "cpu", feature = "vulkan", feature = "cuda")))]
         {
             while running_for_audio.load(Ordering::SeqCst) {
                 if let Ok(msg) = rx.recv_timeout(Duration::from_millis(50)) {
                     match msg {
                         AppMsg::StartRecording => {
-                            log::info!("Recording started (D-Bus mode)...");
+                            log::info!("Recording started...");
                         }
                         AppMsg::StopRecording => {
-                            log::info!("Recording stopped (D-Bus mode)...");
+                            log::info!("Recording stopped (no transcription - build with cpu/vulkan/cuda feature)...");
                         }
                         AppMsg::PartialTranscribe => {}
                     }
                 }
-            }
-        }
-
-        #[cfg(not(any(
-            feature = "cpu",
-            feature = "vulkan",
-            feature = "cuda",
-            feature = "dbus"
-        )))]
-        {
-            while running_for_audio.load(Ordering::SeqCst) {
-                let _ = rx.recv_timeout(Duration::from_millis(50));
             }
         }
     });
@@ -278,7 +220,6 @@ fn main() -> Result<()> {
         }
     });
 
-    // Keep the main thread alive to handle D-Bus messages
     while running.load(Ordering::SeqCst) {
         std::thread::sleep(Duration::from_secs(1));
     }
