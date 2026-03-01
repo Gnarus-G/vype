@@ -41,15 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/gnarus-g/vype/main/install.sh | bas
 
 Options:
 
-- `VYPE_GPU=cuda` — Force CUDA backend (default: auto-detect)
 - `INSTALL_DIR=/path` — Custom install directory (default: `~/.local/bin`)
 - `VERSION=v0.1.0` — Install specific version (default: latest)
-
-Example:
-
-```bash
-VYPE_GPU=cuda INSTALL_DIR=~/bin curl -fsSL https://raw.githubusercontent.com/gnarus-g/vype/main/install.sh | bash
-```
 
 ### Manual Download
 
