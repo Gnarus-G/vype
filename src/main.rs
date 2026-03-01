@@ -216,6 +216,6 @@ fn parse_ptt_key(key: &str) -> Key {
         "F10" => Key::F10,
         "F11" => Key::F11,
         "F12" => Key::F12,
-        _ => Key::F12,
+        _ => Key::F9,
     }
 }

@@ -4,7 +4,7 @@ use vype::config::Config;
 fn config_has_default_values() {
     let config = Config::parse_from::<_, &str>([]);
 
-    assert_eq!(config.key, "F12");
+    assert_eq!(config.key, "F9");
     assert_eq!(config.language, "en");
     assert_eq!(config.max_duration_secs, 30);
     assert_eq!(config.partial_interval_secs, 2.0);
