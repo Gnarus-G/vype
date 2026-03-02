@@ -3,8 +3,9 @@ Description=Vype speech-to-text keyboard (dev)
 
 [Service]
 Type=simple
-ExecStartPre=cargo build -r --features vulkan
-ExecStart=%h/d/vype/target/release/vype -s large
+TimeoutStartSec=15min
+ExecStartPre=cargo build -r -p vyped --features vulkan
+ExecStart=%h/d/vype/target/release/vyped -s large -k F9
 WorkingDirectory=%h/d/vype
 Restart=on-failure
 

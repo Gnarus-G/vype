@@ -1,0 +1,8 @@
+[package]
+name = "vype-shared"
+version = "0.0.1"
+edition = "2024"
+license = "GPL-2.0-only"
+
+[dependencies]
+iceoryx2 = "0.8"

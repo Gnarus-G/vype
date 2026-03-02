@@ -1,0 +1,28 @@
+[package]
+name = "vyped"
+version = "0.0.1"
+edition = "2024"
+license = "GPL-2.0-only"
+
+[[bin]]
+name = "vyped"
+path = "src/main.rs"
+
+[dependencies]
+vype-shared = { path = "../vype-shared" }
+vype = { path = ".." }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+log = "0.4"
+env_logger = "0.11"
+iceoryx2 = "0.8"
+iceoryx2-bb-log = "0.7"
+ctrlc = "3"
+libxdo = "0.6"
+rdev = "0.5"
+
+[features]
+default = []
+cpu = ["vype/cpu"]
+vulkan = ["vype/vulkan"]
+cuda = ["vype/cuda"]

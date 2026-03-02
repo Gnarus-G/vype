@@ -1,3 +1,10 @@
+[workspace]
+members = [
+    "vypec",
+    "vyped",
+    "vype-shared",
+]
+
 [package]
 name = "vype"
 version = "0.0.1"

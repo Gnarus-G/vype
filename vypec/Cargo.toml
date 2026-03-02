@@ -1,0 +1,21 @@
+[package]
+name = "vypec"
+version = "0.0.1"
+edition = "2024"
+license = "GPL-2.0-only"
+
+[[bin]]
+name = "vypec"
+path = "src/main.rs"
+
+[dependencies]
+vype-shared = { path = "../vype-shared" }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+log = "0.4"
+env_logger = "0.11"
+iceoryx2 = "0.8"
+iceoryx2-bb-log = "0.7"
+
+[features]
+default = []
