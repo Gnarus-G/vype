@@ -3,7 +3,7 @@
 ## Development Commands
 
 ```bash
-# Build all components (no transcription feature, fast)
+# Build all components (default CPU backend)
 cargo build
 
 # Build client only
@@ -13,10 +13,10 @@ cargo build -p vypec
 cargo build -p vyped
 
 # Build daemon with Vulkan backend
-cargo build -p vyped --features vulkan
+cargo build -p vyped --no-default-features --features vulkan
 
 # Build daemon with CUDA backend
-cargo build -p vyped --features cuda
+cargo build -p vyped --no-default-features --features cuda
 
 # Test (fast, without whisper)
 cargo test
@@ -35,7 +35,7 @@ Both processes must run simultaneously:
 
 ```bash
 # Terminal 1: Start daemon (with transcription + key handling)
-cargo run -p vyped --features vulkan -- -k F9
+cargo run -p vyped --no-default-features --features vulkan -- -k F9
 
 # Terminal 2: Send commands on demand
 cargo run -p vypec -- toggle

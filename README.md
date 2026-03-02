@@ -2,6 +2,11 @@
 
 Push-to-talk speech-to-text application that types transcribed text directly into any application.
 
+Vype uses a two-process architecture:
+
+- `vyped` daemon: keyboard/PTT, audio capture, transcription, typing
+- `vypec` client: sends control commands (`start`, `stop`, `toggle`, `partial`)
+
 ## Features
 
 - **Push-to-talk**: Hold a key to record, release to transcribe and type
@@ -50,29 +55,34 @@ Download from [GitHub Releases](https://github.com/gnarus-g/vype/releases):
 
 - `vype-vX.X.X-x86_64-linux-vulkan.tar.gz` — For AMD, NVIDIA, or Intel GPUs
 - `vype-vX.X.X-x86_64-linux-cuda.tar.gz` — For NVIDIA GPUs only (may be faster)
+- `vype-vX.X.X-x86_64-linux-cpu.tar.gz` — CPU-only fallback
 
 ## Usage
 
 ```bash
-# Run (CPU backend)
-vype
+# Terminal 1: run daemon (default backend: cpu)
+vyped -k F9
 
-# Press and hold F12 to record, release to transcribe
+# Terminal 2: send one-shot commands
+vypec toggle
+vypec start
+vypec stop
+vypec partial
 ```
 
-- Press and hold **F12** (default) to start recording
-- Release to transcribe and type the result
-- Press **Ctrl+C** to exit
+- Hold configured key (default **F9**) to record, release to transcribe and type.
+- `vypec toggle` starts/stops recording in toggle mode.
+- Press **Ctrl+C** in daemon terminal to exit.
 
 ## CLI Options
 
 ```
-Usage: vype [OPTIONS]
+Usage: vyped [OPTIONS]
 
 Options:
   -m, --model <PATH>       Custom model path (auto-downloads to ~/.config/vype/)
   -s, --model-size <SIZE>  Model size: tiny, base, small, medium, large (default: small)
-  -k, --key <KEY>          PTT key: F1-F12 (default: F12)
+  -k, --key <KEY>          PTT key: F1-F12 (default: F9)
   -l, --language <LANG>    Transcription language (default: en)
   -d, --max-duration <SEC> Max recording duration in seconds (default: 30)
   -h, --help               Print help
@@ -92,16 +102,16 @@ Options:
 
 ```bash
 # Use a larger model for better accuracy
-vype -s large # or medium
+vyped -s large # or medium
 
 # Use F8 as the push-to-talk key
-vype -k F8
+vyped -k F8
 
 # Transcribe in Spanish
-vype -l es
+vyped -l es
 
 # Use a custom model path
-vype -m /path/to/ggml-small.en.bin
+vyped -m /path/to/ggml-small.en.bin
 ```
 
 ## Build from Source
@@ -114,23 +124,23 @@ vype -m /path/to/ggml-small.en.bin
 
 ### Build Commands
 
-Enable exactly one backend feature per build: `cpu`, `vulkan`, or `cuda`.
+Enable exactly one backend feature for `vyped`: `cpu`, `vulkan`, or `cuda`.
 
 ```bash
 # Clone the repository
 git clone https://github.com/gnarus-g/vype.git
 cd vype
 
-# CPU build (works everywhere)
-cargo build --release --features cpu
+# CPU build (default backend)
+cargo build --release -p vyped -p vypec
 
 # Vulkan build (AMD, NVIDIA, Intel GPUs)
-cargo build --release --features vulkan
+cargo build --release -p vyped -p vypec --no-default-features --features vulkan
 
 # CUDA build (NVIDIA GPUs only, requires CUDA Toolkit)
-cargo build --release --features cuda
+cargo build --release -p vyped -p vypec --no-default-features --features cuda
 
-# The binary will be at target/release/vype
+# Binaries will be at target/release/vyped and target/release/vypec
 ```
 
 ## Development

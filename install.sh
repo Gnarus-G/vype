@@ -51,7 +51,7 @@ detect_gpu() {
   elif command -v vulkaninfo &>/dev/null || [ -d /usr/share/vulkan ]; then
     echo "vulkan"
   else
-    echo "vulkan"
+    echo "cpu"
   fi
 }
 
@@ -75,7 +75,11 @@ curl -fsSL "$URL" -o "$TEMP_DIR/$TARBALL"
 
 mkdir -p "$INSTALL_DIR"
 tar -xzf "$TEMP_DIR/$TARBALL" -C "$INSTALL_DIR"
-chmod +x "$INSTALL_DIR/vype"
+chmod +x "$INSTALL_DIR/vyped"
+
+if [ -f "$INSTALL_DIR/vypec" ]; then
+  chmod +x "$INSTALL_DIR/vypec"
+fi
 
 SYSTEMD_DIR="$HOME/.config/systemd/user"
 mkdir -p "$SYSTEMD_DIR"
@@ -87,7 +91,7 @@ cat >"$SYSTEMD_DIR/vype.service" <<EOF
 Description=Vype speech-to-text keyboard
 
 [Service]
-ExecStart=$INSTALL_DIR_ABS/vype -s medium
+ExecStart=$INSTALL_DIR_ABS/vyped -s medium -k F9
 Restart=on-failure
 
 [Install]
@@ -95,7 +99,10 @@ WantedBy=default.target
 EOF
 
 echo ""
-echo "Installed vype to $INSTALL_DIR/vype"
+echo "Installed vyped to $INSTALL_DIR/vyped"
+if [ -f "$INSTALL_DIR/vypec" ]; then
+  echo "Installed vypec to $INSTALL_DIR/vypec"
+fi
 echo "Systemd service installed to $SYSTEMD_DIR/vype.service"
 echo ""
 echo "To enable and start the service:"

@@ -2199,17 +2199,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ringbuf"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe47b720588c8702e34b5979cb3271a8b1842c7cb6f57408efa70c779363488c"
-dependencies = [
- "crossbeam-utils",
- "portable-atomic",
- "portable-atomic-util",
-]
-
-[[package]]
 name = "rubato"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2784,28 +2773,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
-name = "vype"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "clap",
- "cpal",
- "ctrlc",
- "dirs",
- "env_logger",
- "hf-hub",
- "libxdo",
- "log",
- "notify-rust",
- "rdev",
- "ringbuf",
- "rubato",
- "tempfile",
- "thiserror 2.0.18",
- "whisper-rs",
-]
-
-[[package]]
 name = "vype-shared"
 version = "0.0.1"
 dependencies = [
@@ -2831,15 +2798,20 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "clap",
+ "cpal",
  "ctrlc",
+ "dirs",
  "env_logger",
+ "hf-hub",
  "iceoryx2",
  "iceoryx2-bb-log",
  "libxdo",
  "log",
+ "notify-rust",
  "rdev",
- "vype",
+ "rubato",
  "vype-shared",
+ "whisper-rs",
 ]
 
 [[package]]

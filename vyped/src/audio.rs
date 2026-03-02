@@ -1,4 +1,4 @@
-use crate::sources::{AudioSource, SourceError};
+use anyhow::Result;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream};
 use std::sync::{Arc, Mutex};
@@ -12,15 +12,15 @@ pub struct CpalAudioSource {
 }
 
 impl CpalAudioSource {
-    pub fn new() -> Result<Self, SourceError> {
+    pub fn new() -> Result<Self> {
         let host = cpal::default_host();
         let device = host
             .default_input_device()
-            .ok_or_else(|| SourceError::Audio("No default input device found".to_string()))?;
+            .ok_or_else(|| anyhow::anyhow!("No default input device found"))?;
 
         let supported_config = device
             .default_input_config()
-            .map_err(|e| SourceError::Audio(format!("Failed to get default config: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!("Failed to get default config: {}", e))?;
 
         let sample_rate = supported_config.sample_rate().0;
         let channels = supported_config.channels();
@@ -34,26 +34,7 @@ impl CpalAudioSource {
         })
     }
 
-    pub fn with_device(device: Device) -> Result<Self, SourceError> {
-        let supported_config = device
-            .default_input_config()
-            .map_err(|e| SourceError::Audio(format!("Failed to get default config: {}", e)))?;
-
-        let sample_rate = supported_config.sample_rate().0;
-        let channels = supported_config.channels();
-
-        Ok(Self {
-            device,
-            sample_rate,
-            channels,
-            stream: None,
-            buffer: Arc::new(Mutex::new(Vec::new())),
-        })
-    }
-}
-
-impl AudioSource for CpalAudioSource {
-    fn start(&mut self) -> Result<(), SourceError> {
+    pub fn start(&mut self) -> Result<()> {
         self.buffer.lock().unwrap().clear();
 
         let config = cpal::StreamConfig {
@@ -83,30 +64,30 @@ impl AudioSource for CpalAudioSource {
                 |err| eprintln!("Audio stream error: {}", err),
                 None,
             )
-            .map_err(|e| SourceError::Audio(format!("Failed to build input stream: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!("Failed to build input stream: {}", e))?;
 
         stream
             .play()
-            .map_err(|e| SourceError::Audio(format!("Failed to start stream: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!("Failed to start stream: {}", e))?;
 
         self.stream = Some(stream);
         Ok(())
     }
 
-    fn stop(&mut self) -> Vec<f32> {
+    pub fn stop(&mut self) -> Vec<f32> {
         self.stream = None;
         std::mem::take(&mut self.buffer.lock().unwrap())
     }
 
-    fn sample_rate(&self) -> u32 {
+    pub fn sample_rate(&self) -> u32 {
         self.sample_rate
     }
 
-    fn channels(&self) -> u16 {
+    pub fn channels(&self) -> u16 {
         self.channels
     }
 
-    fn get_current_samples(&self) -> Vec<f32> {
+    pub fn get_current_samples(&self) -> Vec<f32> {
         self.buffer.lock().unwrap().clone()
     }
 }

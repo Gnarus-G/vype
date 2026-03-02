@@ -3,21 +3,36 @@ use clap::Parser;
 use iceoryx2::prelude::*;
 use libxdo::XDo;
 use log::{error, info};
-use rdev::{listen, EventType, Key};
-use std::sync::atomic::{AtomicBool, Ordering};
+use rdev::{EventType, Key, listen};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+use std::time::Instant;
 use vype_shared::{AppConfig, PttConfig, PttEvent, PttEventType};
-
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 use vype_shared::{KeyOp, TypingState};
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
-use vype::{
-    model::get_model_path,
-    pure::resample::resample_to_16khz_mono,
-    sources::{AudioSource, CpalAudioSource, Transcriber, WhisperTranscriber},
-};
+mod audio;
+mod model;
+mod resample;
+mod transcriber;
+
+use audio::CpalAudioSource;
+use model::get_model_path;
+use resample::resample_to_16khz_mono;
+use transcriber::WhisperTranscriber;
+
+#[cfg(all(feature = "cpu", any(feature = "cuda", feature = "vulkan")))]
+compile_error!(
+    "Features `cpu` and GPU backends are mutually exclusive. Enable exactly one of: cpu, cuda, vulkan."
+);
+
+#[cfg(all(feature = "cuda", feature = "vulkan"))]
+compile_error!(
+    "Features `cuda` and `vulkan` are mutually exclusive. Enable exactly one of: cpu, cuda, vulkan."
+);
+
+#[cfg(not(any(feature = "cpu", feature = "vulkan", feature = "cuda")))]
+compile_error!("One transcription backend is required. Enable one of: cpu, vulkan, cuda.");
 
 #[derive(Parser, Debug)]
 #[command(name = "vyped")]
@@ -97,7 +112,17 @@ fn parse_ptt_key(key: &str) -> Key {
     }
 }
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
+fn notify(title: &str, body: &str) {
+    if let Err(e) = notify_rust::Notification::new()
+        .summary(title)
+        .body(body)
+        .timeout(2000)
+        .show()
+    {
+        error!("Failed to show notification: {}", e);
+    }
+}
+
 fn execute_key_op(xdo: &XDo, op: &KeyOp) -> Result<()> {
     match op {
         KeyOp::Backspace(n) => {
@@ -127,7 +152,6 @@ fn execute_key_op(xdo: &XDo, op: &KeyOp) -> Result<()> {
     Ok(())
 }
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 fn execute_ops(xdo: &XDo, ops: &[KeyOp]) -> Result<()> {
     for op in ops {
         execute_key_op(xdo, op)?;
@@ -135,7 +159,6 @@ fn execute_ops(xdo: &XDo, ops: &[KeyOp]) -> Result<()> {
     Ok(())
 }
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 fn process_stop(
     typing_state: &mut TypingState,
     audio_source: &mut CpalAudioSource,
@@ -179,7 +202,6 @@ fn process_stop(
     Ok(())
 }
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 fn process_partial(
     typing_state: &mut TypingState,
     audio_source: &mut CpalAudioSource,
@@ -211,10 +233,10 @@ fn process_partial(
     Ok(())
 }
 
-#[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
 fn handle_control_msg(
     msg: ControlMsg,
     is_recording: &Arc<AtomicBool>,
+    recording_started_at: &mut Option<Instant>,
     typing_state: &mut TypingState,
     audio_source: &mut CpalAudioSource,
     transcriber: &WhisperTranscriber,
@@ -224,15 +246,19 @@ fn handle_control_msg(
         ControlMsg::Start => {
             if !is_recording.load(Ordering::SeqCst) {
                 is_recording.store(true, Ordering::SeqCst);
+                *recording_started_at = Some(Instant::now());
                 typing_state.clear();
                 audio_source.start()?;
                 info!("Recording started");
+                notify("Vype", "Recording started");
             }
         }
         ControlMsg::Stop => {
             if is_recording.load(Ordering::SeqCst) {
                 is_recording.store(false, Ordering::SeqCst);
+                *recording_started_at = None;
                 process_stop(typing_state, audio_source, transcriber, xdo)?;
+                notify("Vype", "Recording stopped");
             }
         }
         ControlMsg::Partial => {
@@ -243,39 +269,21 @@ fn handle_control_msg(
         ControlMsg::Toggle => {
             if is_recording.load(Ordering::SeqCst) {
                 is_recording.store(false, Ordering::SeqCst);
+                *recording_started_at = None;
                 process_stop(typing_state, audio_source, transcriber, xdo)?;
+                notify("Vype", "Recording stopped");
             } else {
                 is_recording.store(true, Ordering::SeqCst);
+                *recording_started_at = Some(Instant::now());
                 typing_state.clear();
                 audio_source.start()?;
                 info!("Recording started (toggle)");
+                notify("Vype", "Recording started");
             }
         }
     }
 
     Ok(())
-}
-
-#[cfg(not(any(feature = "cpu", feature = "vulkan", feature = "cuda")))]
-fn handle_control_msg(msg: ControlMsg, is_recording: &Arc<AtomicBool>) {
-    match msg {
-        ControlMsg::Start => {
-            is_recording.store(true, Ordering::SeqCst);
-            info!("Start requested (no transcription support)");
-        }
-        ControlMsg::Stop => {
-            is_recording.store(false, Ordering::SeqCst);
-            info!("Stop requested (no transcription support)");
-        }
-        ControlMsg::Partial => {
-            info!("Partial requested (no transcription support)");
-        }
-        ControlMsg::Toggle => {
-            let next = !is_recording.load(Ordering::SeqCst);
-            is_recording.store(next, Ordering::SeqCst);
-            info!("Toggle requested (no transcription support): {}", next);
-        }
-    }
 }
 
 fn main() -> Result<()> {
@@ -304,6 +312,11 @@ fn main() -> Result<()> {
         "Starting vyped daemon with model size {} and PTT key {}",
         config.model_size, config.ptt.key
     );
+    info!(
+        "Max recording duration: {}s, partial interval: {}s",
+        config.ptt.max_duration, config.ptt.partial_interval
+    );
+    info!("Press Ctrl+C to exit.");
 
     let running = Arc::new(AtomicBool::new(true));
     let is_recording = Arc::new(AtomicBool::new(false));
@@ -313,7 +326,6 @@ fn main() -> Result<()> {
         running_for_ctrlc.store(false, Ordering::SeqCst);
     })?;
 
-    #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
     let (mut audio_source, transcriber, xdo) = {
         let model_path = get_model_path(config.model.as_deref(), Some(&config.model_size))?;
         let model_path_str = model_path
@@ -325,8 +337,9 @@ fn main() -> Result<()> {
         (audio_source, transcriber, xdo)
     };
 
-    #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
     let mut typing_state = TypingState::new();
+    let mut recording_started_at: Option<Instant> = None;
+    let max_recording_duration = Duration::from_secs(config.ptt.max_duration);
 
     let node = NodeBuilder::new()
         .name(&"vyped".try_into()?)
@@ -387,23 +400,34 @@ fn main() -> Result<()> {
         }
 
         while let Ok(msg) = control_rx.try_recv() {
-            #[cfg(any(feature = "cpu", feature = "vulkan", feature = "cuda"))]
-            {
-                if let Err(e) = handle_control_msg(
-                    msg,
-                    &is_recording,
-                    &mut typing_state,
-                    &mut audio_source,
-                    &transcriber,
-                    &xdo,
-                ) {
-                    error!("Failed to process control message: {}", e);
-                }
+            if let Err(e) = handle_control_msg(
+                msg,
+                &is_recording,
+                &mut recording_started_at,
+                &mut typing_state,
+                &mut audio_source,
+                &transcriber,
+                &xdo,
+            ) {
+                error!("Failed to process control message: {}", e);
             }
+        }
 
-            #[cfg(not(any(feature = "cpu", feature = "vulkan", feature = "cuda")))]
-            {
-                handle_control_msg(msg, &is_recording);
+        if is_recording.load(Ordering::SeqCst)
+            && recording_started_at
+                .as_ref()
+                .is_some_and(|t| t.elapsed() >= max_recording_duration)
+        {
+            if let Err(e) = handle_control_msg(
+                ControlMsg::Stop,
+                &is_recording,
+                &mut recording_started_at,
+                &mut typing_state,
+                &mut audio_source,
+                &transcriber,
+                &xdo,
+            ) {
+                error!("Failed to process max-duration stop: {}", e);
             }
         }
 

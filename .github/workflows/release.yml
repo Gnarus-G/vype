@@ -15,10 +15,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - name: cpu
+            features: cpu
+            extra_flags: ""
           - name: vulkan
             features: vulkan
+            extra_flags: "--no-default-features"
           - name: cuda
             features: cuda
+            extra_flags: "--no-default-features"
     
     steps:
       - name: Checkout
@@ -53,12 +58,13 @@ jobs:
             ubuntu-cargo-${{ matrix.name }}-
       
       - name: Build
-        run: cargo build --release --features ${{ matrix.features }}
+        run: cargo build --release -p vyped -p vypec ${{ matrix.extra_flags }} --features ${{ matrix.features }}
       
       - name: Package
         run: |
-          strip target/release/vype
-          tar -czvf vype-${{ github.ref_name }}-x86_64-ubuntu-${{ matrix.name }}.tar.gz -C target/release vype
+          strip target/release/vyped
+          strip target/release/vypec
+          tar -czvf vype-${{ github.ref_name }}-x86_64-ubuntu-${{ matrix.name }}.tar.gz -C target/release vyped vypec
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -73,10 +79,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - name: cpu
+            features: cpu
+            extra_flags: ""
           - name: vulkan
             features: vulkan
+            extra_flags: "--no-default-features"
           - name: cuda
             features: cuda
+            extra_flags: "--no-default-features"
     
     steps:
       - name: Install build dependencies
@@ -110,14 +121,15 @@ jobs:
             arch-cargo-${{ matrix.name }}-
       
       - name: Build
-        run: cargo build --release --features ${{ matrix.features }}
+        run: cargo build --release -p vyped -p vypec ${{ matrix.extra_flags }} --features ${{ matrix.features }}
         env:
           PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.cargo/bin:/opt/cuda/bin
       
       - name: Package
         run: |
-          strip target/release/vype
-          tar -czvf vype-${{ github.ref_name }}-x86_64-arch-${{ matrix.name }}.tar.gz -C target/release vype
+          strip target/release/vyped
+          strip target/release/vypec
+          tar -czvf vype-${{ github.ref_name }}-x86_64-arch-${{ matrix.name }}.tar.gz -C target/release vyped vypec
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -145,7 +157,9 @@ jobs:
             --generate-notes \
             artifacts/vype-ubuntu-vulkan/*.tar.gz \
             artifacts/vype-ubuntu-cuda/*.tar.gz \
+            artifacts/vype-ubuntu-cpu/*.tar.gz \
             artifacts/vype-arch-vulkan/*.tar.gz \
-            artifacts/vype-arch-cuda/*.tar.gz
+            artifacts/vype-arch-cuda/*.tar.gz \
+            artifacts/vype-arch-cpu/*.tar.gz
         env:
           GH_TOKEN: ${{ github.token }}

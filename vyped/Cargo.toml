@@ -10,7 +10,6 @@ path = "src/main.rs"
 
 [dependencies]
 vype-shared = { path = "../vype-shared" }
-vype = { path = ".." }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 log = "0.4"
@@ -20,9 +19,15 @@ iceoryx2-bb-log = "0.7"
 ctrlc = "3"
 libxdo = "0.6"
 rdev = "0.5"
+cpal = "0.15"
+rubato = "0.15"
+hf-hub = "0.3"
+dirs = "5"
+whisper-rs = { version = "0.15", optional = true }
+notify-rust = "4"
 
 [features]
-default = []
-cpu = ["vype/cpu"]
-vulkan = ["vype/vulkan"]
-cuda = ["vype/cuda"]
+default = ["cpu"]
+cpu = ["dep:whisper-rs"]
+vulkan = ["dep:whisper-rs", "whisper-rs/vulkan"]
+cuda = ["dep:whisper-rs", "whisper-rs/cuda"]
