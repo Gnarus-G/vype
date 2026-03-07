@@ -116,7 +116,7 @@ impl Default for AppConfig {
             language: "en".to_string(),
             ptt: PttConfig {
                 key: "F9".to_string(),
-                max_duration: 30,
+                max_duration: 60,
                 partial_interval: 2.0,
             },
         }
