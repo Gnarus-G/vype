@@ -89,10 +89,17 @@ INSTALL_DIR_ABS=$(realpath "$INSTALL_DIR")
 cat >"$SYSTEMD_DIR/vype.service" <<EOF
 [Unit]
 Description=Vype speech-to-text keyboard
+After=graphical-session.target default.target sound.target
+Wants=graphical-session.target
 
 [Service]
-ExecStart=$INSTALL_DIR_ABS/vyped -s medium -k F9
+Type=simple
+Environment=DISPLAY=:0
+ExecStart=/bin/sh -c 'export DISPLAY="\${DISPLAY:-:0}"; if [ -z "\$XAUTHORITY" ] || [ ! -r "\$XAUTHORITY" ]; then for c in /tmp/xauth_* "\$HOME/.Xauthority" "\$XDG_RUNTIME_DIR/Xauthority"; do [ -r "\$c" ] && export XAUTHORITY="\$c" && break; done; fi; exec $INSTALL_DIR_ABS/vyped -s medium -k F9'
 Restart=on-failure
+RestartSec=5
+StartLimitBurst=3
+StartLimitIntervalSec=60
 
 [Install]
 WantedBy=default.target

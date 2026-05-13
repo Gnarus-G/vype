@@ -51,29 +51,33 @@ cargo run -p vypec -- stop
 
 ## Systemd Services
 
-### vype-dev.service
+### vype-dev-cuda.service / vype-dev-vulkan.service
 
-Development service that builds and runs release binary with Vulkan backend.
+Development services that build and run the release binary. Pick the variant matching your GPU stack — enable only one at a time.
 
 ```bash
-# Install/update service
-cp vype-dev.service ~/.config/systemd/user/
+# Pick ONE variant
+VARIANT=vype-dev-cuda     # NVIDIA + CUDA toolkit
+# VARIANT=vype-dev-vulkan # requires libvulkan-dev + glslc
+
+# Install/update
+cp $VARIANT.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 
 # Enable (autostart on login)
-systemctl --user enable vype-dev
+systemctl --user enable $VARIANT
 
 # Start now
-systemctl --user start vype-dev
+systemctl --user start $VARIANT
 
 # Restart (rebuilds and runs)
-systemctl --user restart vype-dev
+systemctl --user restart $VARIANT
 
 # View logs
-journalctl --user -u vype-dev -f
+journalctl --user -u $VARIANT -f
 ```
 
-Service builds and runs `target/release/vyped -s large -k F9` with Vulkan.
+Each unit builds and runs `target/release/vyped -s large -k F9` with its respective backend.
 
 ### Production Service (install.sh)
 
